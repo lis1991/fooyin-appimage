@@ -1,4 +1,4 @@
-name: Build AppImage from .deb (Universal)
+name: Build AppImage (Universal)
 
 on:
   schedule:
@@ -18,7 +18,7 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 📦 Install System Dependencies
+      - name: 📦 Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y wget curl jq python3-pip desktop-file-utils
@@ -41,7 +41,7 @@ jobs:
       - name: 📤 Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppImage
+          name: Fooyin-AppImage
           path: '*.AppImage'
 
       - name: 🏷️ Extract Version (Optional)
