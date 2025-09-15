@@ -1,14 +1,14 @@
-# AppImageBuilder.yml — Универсальный сборщик AppImage из .deb (без привязки к версии)
+# AppImageBuilder.yml — Автоматическая сборка Fooyin AppImage из последнего .deb
 version: 1
-app_id: com.example.App
+app_id: com.fooyin.Fooyin
 
 AppDir:
   path: AppDir
 
-  # 🚀 Автоматически скачивает последний .deb из GitHub Releases и распаковывает его
+  # 🚀 Автоматически скачивает последнюю версию Fooyin .deb и распаковывает её
   script:
     - |
-      echo "🔍 Detecting latest release from fooyin/fooyin..."
+      echo "🔍 Detecting latest Fooyin release..."
       LATEST_TAG=$(curl -s "https://api.github.com/repos/fooyin/fooyin/releases/latest" | jq -r '.tag_name')
       DEB_URL="https://github.com/fooyin/fooyin/releases/download/$LATEST_TAG/fooyin_${LATEST_TAG#v}-plucky_amd64.deb"
       echo "📥 Downloading: $DEB_URL"
@@ -19,13 +19,13 @@ AppDir:
       ar x fooyin_latest.deb
       tar -xf data.tar.xz -C AppDir/
 
-      echo "🗑️ Cleaning up..."
+      echo "🗑️ Cleaning up temporary files..."
       rm -f fooyin_latest.deb data.tar.xz control.tar.gz debian-binary
 
   app_info:
-    id: com.example.App
-    name: App
-    icon: app
+    id: com.fooyin.Fooyin
+    name: Fooyin
+    icon: fooyin
     exec: usr/bin/fooyin
     exec_args: $@
 
@@ -85,7 +85,7 @@ AppDir:
       - libstdc++6
       - libgcc-s1
 
-  # ✅ ВАЖНО: Словарь, а не список! Совместимо с AppImageBuilder v1
+  # ✅ ПРАВИЛЬНЫЙ ФОРМАТ ДЛЯ AppImageBuilder v1 — СЛОВАРЬ, а не список!
   files:
     usr/bin/: usr/bin/
     usr/lib/: usr/lib/
@@ -101,7 +101,7 @@ AppDir:
 
   desktop:
     enabled: true
-    name: App
+    name: Fooyin
     comment: A modern music player with a focus on high-quality audio playback
     exec: usr/bin/fooyin
     icon: fooyin
@@ -128,7 +128,7 @@ AppDir:
     usr/share/icons/hicolor/*/apps/fooyin.*: 644
 
 AppImage:
-  update-information: gh-releases-zsync|fooyin|fooyin|latest|App-latest-x86_64.AppImage.zsync
+  update-information: gh-releases-zsync|fooyin|fooyin|latest|Fooyin-latest-x86_64.AppImage.zsync
   compress: zstd
   architecture: x86_64
   sign-key: null
