@@ -1,5 +1,4 @@
-# AppImageBuilder configuration for Fooyin v0.9.1
-# Compatible with AppImageBuilder v1 (GitHub Actions runner)
+# AppImageBuilder.yml — Совместимо с AppImageBuilder v1.x (GitHub Actions)
 version: 1
 app_id: com.fooyin.Fooyin
 
@@ -20,6 +19,7 @@ AppDir:
       - sourceline: deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
       - sourceline: deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
     include:
+      # Основные зависимости Fooyin + Qt6 + FFmpeg
       - libqt6core6
       - libqt6gui6
       - libqt6widgets6
@@ -69,7 +69,7 @@ AppDir:
       - libstdc++6
       - libgcc-s1
 
-  # ✅ ИСПРАВЛЕНО: files теперь словарь, а не список!
+  # ✅ ИСПРАВЛЕНО: files — это словарь, а не список!
   files:
     usr/bin/: usr/bin/
     usr/lib/: usr/lib/
