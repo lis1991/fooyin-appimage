@@ -1,14 +1,31 @@
-# AppImageBuilder.yml — Совместимо с AppImageBuilder v1.x (GitHub Actions)
+# AppImageBuilder.yml — Универсальный сборщик AppImage из .deb (без привязки к версии)
 version: 1
-app_id: com.fooyin.Fooyin
+app_id: com.example.App
 
 AppDir:
   path: AppDir
 
+  # 🚀 Автоматически скачивает последний .deb из GitHub Releases и распаковывает его
+  script:
+    - |
+      echo "🔍 Detecting latest release from fooyin/fooyin..."
+      LATEST_TAG=$(curl -s "https://api.github.com/repos/fooyin/fooyin/releases/latest" | jq -r '.tag_name')
+      DEB_URL="https://github.com/fooyin/fooyin/releases/download/$LATEST_TAG/fooyin_${LATEST_TAG#v}-plucky_amd64.deb"
+      echo "📥 Downloading: $DEB_URL"
+      wget -O fooyin_latest.deb "$DEB_URL"
+
+      echo "📦 Extracting .deb to AppDir..."
+      mkdir -p AppDir
+      ar x fooyin_latest.deb
+      tar -xf data.tar.xz -C AppDir/
+
+      echo "🗑️ Cleaning up..."
+      rm -f fooyin_latest.deb data.tar.xz control.tar.gz debian-binary
+
   app_info:
-    id: com.fooyin.Fooyin
-    name: Fooyin
-    icon: fooyin
+    id: com.example.App
+    name: App
+    icon: app
     exec: usr/bin/fooyin
     exec_args: $@
 
@@ -19,7 +36,6 @@ AppDir:
       - sourceline: deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
       - sourceline: deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
     include:
-      # Основные зависимости Fooyin + Qt6 + FFmpeg
       - libqt6core6
       - libqt6gui6
       - libqt6widgets6
@@ -69,7 +85,7 @@ AppDir:
       - libstdc++6
       - libgcc-s1
 
-  # ✅ ИСПРАВЛЕНО: files — это словарь, а не список!
+  # ✅ ВАЖНО: Словарь, а не список! Совместимо с AppImageBuilder v1
   files:
     usr/bin/: usr/bin/
     usr/lib/: usr/lib/
@@ -85,7 +101,7 @@ AppDir:
 
   desktop:
     enabled: true
-    name: Fooyin
+    name: App
     comment: A modern music player with a focus on high-quality audio playback
     exec: usr/bin/fooyin
     icon: fooyin
@@ -112,7 +128,7 @@ AppDir:
     usr/share/icons/hicolor/*/apps/fooyin.*: 644
 
 AppImage:
-  update-information: gh-releases-zsync|fooyin|fooyin|v0.9.1|Fooyin-v0.9.1-x86_64.AppImage.zsync
+  update-information: gh-releases-zsync|fooyin|fooyin|latest|App-latest-x86_64.AppImage.zsync
   compress: zstd
   architecture: x86_64
   sign-key: null
