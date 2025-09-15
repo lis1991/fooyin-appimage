@@ -1,0 +1,2 @@
+# fooyin-appimage
+Fooyin AppImage
