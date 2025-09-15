@@ -1,6 +1,5 @@
 # AppImageBuilder configuration for Fooyin v0.9.1
-# Based on fooyin_0.9.1-plucky_amd64.deb on Ubuntu 24.04
-
+# Compatible with AppImageBuilder v1 (GitHub Actions runner)
 version: 1
 app_id: com.fooyin.Fooyin
 
@@ -14,8 +13,6 @@ AppDir:
     exec: usr/bin/fooyin
     exec_args: $@
 
-  # Dependencies from .deb package and system libraries
-  # We'll extract the .deb and then collect all needed files
   apt:
     arch: amd64
     sources:
@@ -23,7 +20,6 @@ AppDir:
       - sourceline: deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
       - sourceline: deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
     include:
-      # Core dependencies from fooyin .deb
       - libqt6core6
       - libqt6gui6
       - libqt6widgets6
@@ -73,29 +69,20 @@ AppDir:
       - libstdc++6
       - libgcc-s1
 
-  # Copy files from extracted .deb
+  # ✅ ИСПРАВЛЕНО: files теперь словарь, а не список!
   files:
-    - source: usr/bin/
-      dest: usr/bin/
-    - source: usr/lib/
-      dest: usr/lib/
-    - source: usr/share/applications/
-      dest: usr/share/applications/
-    - source: usr/share/icons/
-      dest: usr/share/icons/
-    - source: usr/share/metainfo/
-      dest: usr/share/metainfo/
-    - source: usr/share/fooyin/
-      dest: usr/share/fooyin/
-    - source: usr/share/doc/
-      dest: usr/share/doc/
+    usr/bin/: usr/bin/
+    usr/lib/: usr/lib/
+    usr/share/applications/: usr/share/applications/
+    usr/share/icons/: usr/share/icons/
+    usr/share/metainfo/: usr/share/metainfo/
+    usr/share/fooyin/: usr/share/fooyin/
+    usr/share/doc/: usr/share/doc/
 
-  # Ensure icon is present and set correctly
   icons:
     - fooyin.png
     - fooyin.svg
 
-  # Create desktop file if not present or fix it
   desktop:
     enabled: true
     name: Fooyin
@@ -119,11 +106,10 @@ AppDir:
       - audio/flac
       - audio/mp4
 
-  # Fix permissions
   permissions:
-    - usr/bin/fooyin: 755
-    - usr/share/applications/com.fooyin.Fooyin.desktop: 644
-    - usr/share/icons/hicolor/*/apps/fooyin.*: 644
+    usr/bin/fooyin: 755
+    usr/share/applications/com.fooyin.Fooyin.desktop: 644
+    usr/share/icons/hicolor/*/apps/fooyin.*: 644
 
 AppImage:
   update-information: gh-releases-zsync|fooyin|fooyin|v0.9.1|Fooyin-v0.9.1-x86_64.AppImage.zsync
@@ -131,6 +117,5 @@ AppImage:
   architecture: x86_64
   sign-key: null
 
-  # Optional: Embed runtime (recommended)
   runtime:
     version: latest
