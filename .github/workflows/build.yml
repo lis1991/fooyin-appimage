@@ -163,7 +163,7 @@ jobs:
         with:
           files: Fooyin-*.AppImage
           tag_name: ${{ env.LATEST_TAG }}
-          name: Fooyin v${{ env.LATEST_TAG }}
+          name: Fooyin ${{ env.LATEST_TAG }}
           body: |
             Fooyin AppImage собран автоматически из последнего .deb пакета.
 
