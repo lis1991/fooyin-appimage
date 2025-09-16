@@ -10,7 +10,6 @@ on:
 jobs:
   build-appimage:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Клонировать репозиторий
         uses: actions/checkout@v4
@@ -37,7 +36,6 @@ jobs:
           DEB_URL="https://github.com/fooyin/fooyin/releases/download/${LATEST_TAG}/fooyin_${LATEST_TAG#v}-plucky_amd64.deb"
           echo "📥 Скачивание: $DEB_URL"
           wget -O fooyin_latest.deb "$DEB_URL"
-
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "DEB_URL=$DEB_URL" >> $GITHUB_ENV
           echo "✅ Успешно скачано: $LATEST_TAG"
@@ -88,32 +86,29 @@ jobs:
       - name: Создать скрипт AppRun
         run: |
           cat > AppDir/AppRun << 'EOF'
-#!/bin/bash
-
-HERE="$(dirname "$(readlink -f "${0}")")"
-
-export LD_LIBRARY_PATH="${HERE}/usr/lib/x86_64-linux-gnu:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
-export QT_PLUGIN_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/plugins"
-export QML2_IMPORT_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/qml"
-export PATH="${HERE}/usr/bin:${PATH}"
-
-exec "${HERE}/usr/bin/fooyin" "$@"
-EOF
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib/x86_64-linux-gnu:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          export QT_PLUGIN_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/plugins"
+          export QML2_IMPORT_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/qml"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/fooyin" "$@"
+          EOF
           chmod +x AppDir/AppRun
 
       - name: Создать .desktop файл
         run: |
           cat > AppDir/fooyin.desktop << 'EOF'
-[Desktop Entry]
-Name=Fooyin
-Comment=Современный проигрыватель музыки с фокусом на высококачественное воспроизведение аудио
-Exec=fooyin
-Icon=fooyin
-Terminal=false
-Type=Application
-Categories=AudioVideo;Audio;
-MimeType=audio/mpeg;audio/x-flac;audio/wav;audio/x-wav;audio/ogg;audio/x-ogg;audio/aac;audio/x-m4a;audio/flac;audio/mp4;
-EOF
+          [Desktop Entry]
+          Name=Fooyin
+          Comment=Современный проигрыватель музыки с фокусом на высококачественное воспроизведение аудио
+          Exec=fooyin
+          Icon=fooyin
+          Terminal=false
+          Type=Application
+          Categories=AudioVideo;Audio;
+          MimeType=audio/mpeg;audio/x-flac;audio/wav;audio/x-wav;audio/ogg;audio/x-ogg;audio/aac;audio/x-m4a;audio/flac;audio/mp4;
+          EOF
 
       - name: Скопировать иконку
         run: |
@@ -138,6 +133,11 @@ EOF
           name: Fooyin-AppImage
           path: Fooyin-*.AppImage
 
+      - name: Получить текущую дату
+        id: get-date
+        run: |
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_ENV
+
       - name: Создать GitHub Release (только при тегах)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
@@ -147,6 +147,6 @@ EOF
             Fooyin AppImage собран автоматически из последнего .deb пакета.
 
             **Версия:** ${{ env.LATEST_TAG }}
-            **Дата сборки:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            **Дата сборки:** ${{ env.BUILD_DATE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
