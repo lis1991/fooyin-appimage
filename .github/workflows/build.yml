@@ -31,8 +31,7 @@ jobs:
             libxcomposite1 libxdamage1 libxext6 libxfixes3 \
             libxrandr2 libxrender1 libasound2t64 libatspi2.0-0 \
             libqt6core6 libqt6gui6 libqt6widgets6 libqt6qml6 libqt6quick6 \
-            libqt6multimedia6 libqt6opengl6 \
-            libswresample-dev libswscale7
+            libqt6multimedia6 libqt6opengl6
 
       - name: Скачать последний .deb пакет Fooyin
         id: download-deb
