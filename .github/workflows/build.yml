@@ -155,6 +155,7 @@ jobs:
           mkdir -p AppDir/usr/lib
           cp $HOME/ffmpeg_build/lib/libavcodec.so* AppDir/usr/lib/
           cp $HOME/ffmpeg_build/lib/libavformat.so* AppDir/usr/lib/
+          cp $HOME/ffmpeg_build/lib/*.so* AppDir/usr/lib/
           # cp -r $HOME/ffmpeg_build/include AppDir/usr/ # Обычно не нужно для AppImage
           
           echo "Файлы в AppDir/usr/lib/ после копирования:"
