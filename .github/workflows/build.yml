@@ -94,6 +94,9 @@ jobs:
           echo "=== Копирование библиотек ICU 76.1 в AppDir ==="
           mkdir -p AppDir/usr/lib
           # Предполагаем, что библиотеки находятся в подкаталоге lib после распаковки
+          echo
+          ls -la
+          echo
           cp icu/usr/local/*.* AppDir/usr/lib/
           # Копируем также символьные ссылки .so и основные библиотеки, если они есть в архиве
           # cp icu4c-76_1-Ubuntu22.04-x64/lib/libicui18n.so AppDir/usr/lib/ 2>/dev/null || echo "libicui18n.so (symlink) not found"
