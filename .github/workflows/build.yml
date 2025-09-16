@@ -97,9 +97,9 @@ jobs:
           echo
           ls -la
           echo
-          ls -la ./icu/usr/local/
+          ls -la ./icu/usr/local/lib/
           echo
-          cp ./icu/usr/local/*.* AppDir/usr/lib/
+          cp ./icu/usr/local/lib/*.* AppDir/usr/lib/
           # Копируем также символьные ссылки .so и основные библиотеки, если они есть в архиве
           # cp icu4c-76_1-Ubuntu22.04-x64/lib/libicui18n.so AppDir/usr/lib/ 2>/dev/null || echo "libicui18n.so (symlink) not found"
           # cp icu4c-76_1-Ubuntu22.04-x64/lib/libicuuc.so AppDir/usr/lib/ 2>/dev/null || echo "libicuuc.so (symlink) not found"
