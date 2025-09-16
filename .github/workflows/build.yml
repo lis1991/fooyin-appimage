@@ -21,17 +21,6 @@ jobs:
 
       - name: Установить зависимости
         run: |
-          # Добавляем репозиторий deb-multimedia.org
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg2
-
-          # Скачиваем последнюю версию ключа напрямую с сайта
-          wget -O deb-multimedia-keyring.deb https://www.deb-multimedia.org/pool/main/d/deb-multimedia-keyring/
-          sudo dpkg -i deb-multimedia-keyring.deb || true
-
-          # Добавляем репозиторий для текущего дистрибутива
-          CODENAME=$(lsb_release -sc)
-          echo "deb http://www.deb-multimedia.org $CODENAME main non-free" | sudo tee /etc/apt/sources.list.d/deb-multimedia.list
           
           sudo apt-get update
           sudo apt-get install -y wget curl jq binutils tar file libfuse2 \
@@ -94,6 +83,50 @@ jobs:
       - name: Скопировать файлы из .deb в AppDir
         run: |
           cp -r fooyin-appdir/usr/* AppDir/usr/
+
+      # -----------------------
+      # 1. Кешируем уже собранные библиотеки
+      - name: Cache FFmpeg libs
+        id: cache-ffmpeg
+        uses: actions/cache@v3
+        with:
+          path: ~/ffmpeg_build
+          key: ffmpeg-6.0-${{ runner.os }}
+
+	    # -----------------------
+	    # 2. Сборка libavcodec61/libavformat61, если кеш пустой
+      - name: Build libavcodec61/libavformat61
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake build-essential cmake git libtool \
+          pkg-config texinfo yasm nasm zlib1g-dev libx264-dev libx265-dev \
+          libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev wget
+
+          mkdir -p ~/ffmpeg_build && cd ~/ffmpeg_build
+          wget https://ffmpeg.org/releases/ffmpeg-6.0.tar.bz2
+          tar xjf ffmpeg-6.0.tar.bz2
+          cd ffmpeg-6.0
+          ./configure --prefix=$HOME/ffmpeg_build --disable-programs --disable-doc --enable-shared
+          make -j$(nproc)
+          make install
+
+	    # -----------------------
+	    # 3. Копируем библиотеки в AppDir
+      - name: Copy FFmpeg libs to AppDir
+        run: |
+          mkdir -p AppDir/usr/lib
+          cp $HOME/ffmpeg_build/lib/libavcodec.so* AppDir/usr/lib/
+          cp $HOME/ffmpeg_build/lib/libavformat.so* AppDir/usr/lib/
+          cp -r $HOME/ffmpeg_build/include AppDir/usr/
+
+	    # -----------------------
+	    # 4. Устанавливаем LD_LIBRARY_PATH в AppRun
+      - name: Set library path
+        run: |
+          echo 'export LD_LIBRARY_PATH=$APPDIR/usr/lib:$LD_LIBRARY_PATH' >> AppDir/AppRun
+
+	    # -----------------------
 
       - name: Скопировать все зависимости библиотек
         run: |
