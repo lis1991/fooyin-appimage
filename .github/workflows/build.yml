@@ -28,10 +28,10 @@ jobs:
             libexpat1 libfontconfig1 libgbm1 libgl1 \
             libgtk-3-0 libpango-1.0-0 libx11-6 libxcb1 \
             libxcomposite1 libxdamage1 libxext6 libxfixes3 \
-            libxrandr2 libxrender1 libasound2 libatspi2.0-0 \
+            libxrandr2 libxrender1 libasound2t64 libatspi2.0-0 \
             libqt6core6 libqt6gui6 libqt6widgets6 libqt6qml6 libqt6quick6 \
             libqt6multimedia6 libqt6opengl6 \
-            libavcodec59 libavformat59 libswresample4 libswscale6
+            libavcodec60 libavformat60 libswresample5 libswscale7
 
       - name: Скачать последний .deb пакет Fooyin
         id: download-deb
