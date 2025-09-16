@@ -1,0 +1,143 @@
+name: Build Fooyin AppImage
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Еженедельно в воскресенье
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y wget curl jq binutils tar file libfuse2 \
+                          libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
+                          libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 \
+                          libexpat1 libfontconfig1 libgbm1 libgl1 \
+                          libgtk-3-0 libpango-1.0-0 libx11-6 libxcb1 \
+                          libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+                          libxrandr2 libxrender1 libasound2 libatspi2.0-0 \
+                          libqt6core6 libqt6gui6 libqt6widgets6 libqt6qml6 libqt6quick6 \
+                          libqt6multimedia6 libqt6opengl6 \
+                          libavcodec59 libavformat59 libswresample4 libswscale6
+
+    - name: Download latest Fooyin .deb
+      run: |
+        echo "🔍 Detecting latest Fooyin release..."
+        LATEST_TAG=$(curl -s "https://api.github.com/repos/fooyin/fooyin/releases/latest" | jq -r '.tag_name')
+        DEB_URL="https://github.com/fooyin/fooyin/releases/download/${LATEST_TAG}/fooyin_${LATEST_TAG#v}-plucky_amd64.deb"
+        echo "📥 Downloading: $DEB_URL"
+        wget -O fooyin_latest.deb "$DEB_URL"
+        echo "DEB_URL=$DEB_URL" >> $GITHUB_ENV
+        echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+    - name: Extract .deb package
+      run: |
+        echo "📦 Extracting .deb package..."
+        ar x fooyin_latest.deb
+        mkdir -p fooyin-appdir
+        tar -xf data.tar.xz -C fooyin-appdir/
+        rm -f fooyin_latest.deb data.tar.xz control.tar.gz debian-binary
+
+    - name: Download AppImage tools
+      run: |
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+
+    - name: Create AppDir structure
+      run: |
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/lib
+        mkdir -p AppDir/usr/share
+        mkdir -p AppDir/usr/lib/x86_64-linux-gnu
+
+    - name: Copy extracted files
+      run: |
+        cp -r fooyin-appdir/usr/* AppDir/usr/
+
+    - name: Copy runtime dependencies
+      run: |
+        copy_deps() {
+          local binary="$1"
+          for lib in $(ldd "$binary" | awk '{print $3}' | grep -v '('); do
+            if [ -f "$lib" ]; then
+              cp --parents "$lib" AppDir/
+            fi
+          done
+        }
+
+        copy_deps "AppDir/usr/bin/fooyin"
+
+    - name: Create AppRun script
+      run: |
+        cat > AppDir/AppRun << 'EOF'
+#!/bin/bash
+
+HERE="$(dirname "$(readlink -f "${0}")")"
+
+export LD_LIBRARY_PATH="${HERE}/usr/lib/x86_64-linux-gnu:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/plugins"
+export QML2_IMPORT_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/qml"
+export PATH="${HERE}/usr/bin:${PATH}"
+
+exec "${HERE}/usr/bin/fooyin" "$@"
+EOF
+        chmod +x AppDir/AppRun
+
+    - name: Create .desktop file
+      run: |
+        cat > AppDir/fooyin.desktop << 'EOF'
+[Desktop Entry]
+Name=Fooyin
+Comment=A modern music player with a focus on high-quality audio playback
+Exec=fooyin
+Icon=fooyin
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;
+MimeType=audio/mpeg;audio/x-flac;audio/wav;audio/x-wav;audio/ogg;audio/x-ogg;audio/aac;audio/x-m4a;audio/flac;audio/mp4;
+EOF
+
+    - name: Copy icons
+      run: |
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        ICON_FILE=$(find AppDir/usr/share/icons -name "*fooyin*" -o -name "*Fooyin*" -type f | head -1)
+        if [ -n "$ICON_FILE" ]; then
+          cp "$ICON_FILE" AppDir/usr/share/icons/hicolor/256x256/apps/fooyin.png
+          cp "$ICON_FILE" AppDir/fooyin.png
+          echo "✅ Icon copied: $ICON_FILE"
+        else
+          echo "⚠️ Icon not found, skipping"
+        fi
+
+    - name: Build AppImage
+      run: |
+        ./appimagetool-x86_64.AppImage AppDir Fooyin-${LATEST_TAG}-x86_64.AppImage
+
+    - name: Upload AppImage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Fooyin-AppImage
+        path: Fooyin-*.AppImage
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: Fooyin-*.AppImage
+        body: |
+          Fooyin AppImage built automatically from the latest .deb package
+          
+          **Version:** ${{ env.LATEST_TAG }}
+          **Build Date:** $(date -u +"%Y-%m-%d")
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
