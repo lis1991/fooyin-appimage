@@ -162,7 +162,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: Fooyin-*.AppImage
-          tag_name: v${{ env.LATEST_TAG }}
+          tag_name: ${{ env.LATEST_TAG }}
           name: Fooyin v${{ env.LATEST_TAG }}
           body: |
             Fooyin AppImage собран автоматически из последнего .deb пакета.
