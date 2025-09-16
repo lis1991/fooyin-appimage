@@ -84,17 +84,45 @@ jobs:
           cp -r fooyin-appdir/usr/* AppDir/usr/
 
       # -----------------------
-      # 1. Кешируем уже собранные библиотеки
-      - name: Cache FFmpeg libs
+      # 1. Получить последний тег FFmpeg версии 7.x.x
+      - name: Get Latest FFmpeg 7.x Tag
+        id: ffmpeg-tag
+        run: |
+          # Клонируем репозиторий FFmpeg в временную директорию
+          cd /tmp
+          git clone --bare --filter=blob:none --quiet https://git.ffmpeg.org/ffmpeg.git ffmpeg_temp
+          cd ffmpeg_temp
+          
+          # Получаем все теги
+          # Фильтруем теги, начинающиеся с 'n7.' (например, n7.0, n7.1)
+          # Сортируем по версии и берем последний
+          LATEST_TAG=$(git tag -l "n7.*" | sort -V | tail -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "::error::Не удалось найти тег FFmpeg версии 7.x.x"
+            exit 1
+          fi
+          
+          # Получаем хэш коммита для этого тега
+          TAG_HASH=$(git rev-parse "$LATEST_TAG")
+          
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "hash=$TAG_HASH" >> $GITHUB_OUTPUT
+          echo "Найден последний тег FFmpeg 7.x.x: $LATEST_TAG ($TAG_HASH)"
+
+      # -----------------------
+      # 2. Кешируем сборку FFmpeg из Git
+      - name: Cache FFmpeg Git Build
         id: cache-ffmpeg
         uses: actions/cache@v3
         with:
           path: ~/ffmpeg_build
-          key: ffmpeg-6.1-${{ runner.os }}
+          # Кэш будет промахиваться, если хэш коммита изменится
+          key: ffmpeg-git-${{ steps.ffmpeg-tag.outputs.hash }}-${{ runner.os }}
 
       # -----------------------
-      # 2. Сборка libavcodec61/libavformat61, если кеш пустой
-      - name: Build libavcodec61/libavformat61
+      # 3. Сборка FFmpeg из Git, если кеш пустой
+      - name: Build FFmpeg from Git
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
@@ -102,32 +130,41 @@ jobs:
           pkg-config texinfo yasm nasm zlib1g-dev libx264-dev libx265-dev \
           libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev wget
 
-          mkdir -p ~/ffmpeg_build && cd ~/ffmpeg_build
-          wget https://ffmpeg.org/releases/ffmpeg-6.1.tar.bz2
-          tar xjf ffmpeg-6.1.tar.bz2
-          cd ffmpeg-6.1
-          ./configure --prefix=$HOME/ffmpeg_build --disable-programs --disable-doc --enable-shared
+          mkdir -p ~/ffmpeg_build_source && cd ~/ffmpeg_build_source
+          git clone https://git.ffmpeg.org/ffmpeg.git
+          cd ffmpeg
+          
+          # Переходим к найденному тегу
+          git checkout tags/${{ steps.ffmpeg-tag.outputs.tag }} -b build-branch
+          
+          # Конфигурация для сборки shared libraries (.so.x)
+          # Отключаем статические библиотеки и программы, которые не нужны
+          # Отключаем yasm/asm, если возникают ошибки (по аналогии с предыдущими попытками)
+          ./configure --prefix=$HOME/ffmpeg_build --disable-programs --disable-doc --enable-shared --disable-static --disable-yasm --disable-asm
           make -j$(nproc)
           make install
 
       # -----------------------
-      # 3. Копируем библиотеки в AppDir
-      - name: Copy FFmpeg libs to AppDir
+      # 4. Копируем библиотеки в AppDir и проверяем
+      - name: Copy FFmpeg libs to AppDir and verify
         run: |
+          echo "=== Копирование библиотек FFmpeg из Git-сборки ==="
+          echo "Ищем файлы в $HOME/ffmpeg_build/lib/:"
+          ls -la $HOME/ffmpeg_build/lib/libavcodec.so* $HOME/ffmpeg_build/lib/libavformat.so* 2>/dev/null || echo "Файлы .so* не найдены в сборке"
+          
           mkdir -p AppDir/usr/lib
-          ls -la $HOME/ffmpeg_build/lib/libavcodec.so* 2>/dev/null || echo "Файлы libavcodec.so* не найдены"
           cp $HOME/ffmpeg_build/lib/libavcodec.so* AppDir/usr/lib/
-          ls -la $HOME/ffmpeg_build/lib/libavformat.so* 2>/dev/null || echo "Файлы libavformat.so* не найдены"
           cp $HOME/ffmpeg_build/lib/libavformat.so* AppDir/usr/lib/
-          cp -r $HOME/ffmpeg_build/include AppDir/usr/
+          # cp -r $HOME/ffmpeg_build/include AppDir/usr/ # Обычно не нужно для AppImage
+          
+          echo "Файлы в AppDir/usr/lib/ после копирования:"
+          ls -la AppDir/usr/lib/libavcodec.so* AppDir/usr/lib/libavformat.so* 2>/dev/null || echo "Файлы .so* отсутствуют в AppDir"
 
       # -----------------------
-      # 4. Устанавливаем LD_LIBRARY_PATH в AppRun
+      # 5. Устанавливаем LD_LIBRARY_PATH в AppRun
       - name: Set library path
         run: |
           echo 'export LD_LIBRARY_PATH=$APPDIR/usr/lib:$LD_LIBRARY_PATH' >> AppDir/AppRun
-
-      # -----------------------
 
       - name: Скопировать все зависимости библиотек
         run: |
