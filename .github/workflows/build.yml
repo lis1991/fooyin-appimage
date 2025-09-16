@@ -9,6 +9,9 @@ on:
     tags:
       - 'v*' # Также собирать при новом теге (например, v1.2.3)
 
+permissions:
+  contents: write   # нужно для создания релизов
+
 jobs:
   build-appimage:
     runs-on: ubuntu-24.04
@@ -18,8 +21,8 @@ jobs:
 
       - name: Установить зависимости
         run: |
-          apt-get update
-          apt-get install -y wget curl jq binutils tar file libfuse2 \
+          sudo apt-get update
+          sudo apt-get install -y wget curl jq binutils tar file libfuse2 \
             libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
             libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 \
             libexpat1 libfontconfig1 libgbm1 libgl1 \
