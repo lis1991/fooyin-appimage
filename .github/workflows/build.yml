@@ -21,6 +21,18 @@ jobs:
 
       - name: Установить зависимости
         run: |
+          # Добавляем репозиторий deb-multimedia.org
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg2
+
+          # Скачиваем последнюю версию ключа напрямую с сайта
+          wget -O deb-multimedia-keyring.deb https://www.deb-multimedia.org/pool/main/d/deb-multimedia-keyring/
+          sudo dpkg -i deb-multimedia-keyring.deb || true
+
+          # Добавляем репозиторий для текущего дистрибутива
+          CODENAME=$(lsb_release -sc)
+          echo "deb http://www.deb-multimedia.org $CODENAME main non-free" | sudo tee /etc/apt/sources.list.d/deb-multimedia.list
+          
           sudo apt-get update
           sudo apt-get install -y wget curl jq binutils tar file libfuse2 \
             libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
