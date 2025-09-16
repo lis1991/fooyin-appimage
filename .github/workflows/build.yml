@@ -215,6 +215,19 @@ jobs:
           }
           copy_deps "AppDir/usr/bin/fooyin"
 
+      - name: Добавить libstdc++ в AppDir
+        run: |
+          echo "📦 Копирование libstdc++ в AppDir..."
+          LIBSTDCPP=$(g++ -print-file-name=libstdc++.so.6)
+          if [ -f "$LIBSTDCPP" ]; then
+            cp "$LIBSTDCPP" AppDir/usr/lib/
+            echo "✅ Скопирован: $LIBSTDCPP"
+          else
+            echo "❌ Не удалось найти libstdc++"
+            exit 1
+          fi
+
+
       - name: Создать скрипт AppRun
         run: |
           cat > AppDir/AppRun << 'EOF'
