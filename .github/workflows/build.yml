@@ -45,13 +45,27 @@ jobs:
           echo "DEB_URL=$DEB_URL" >> $GITHUB_ENV
           echo "✅ Успешно скачано: $LATEST_TAG"
 
-      - name: Распаковать .deb пакет
+      - name: 📦 Распаковка .deb файла
         run: |
           echo "📦 Распаковка .deb файла..."
-          ar x fooyin_latest.deb
+          # Находим скачанный .deb
+          DEB_FILE=$(ls *.deb | head -n 1)
+          echo "Найден пакет: $DEB_FILE"
+
+          # Распаковываем содержимое deb (ar-архив)
+          ar x "$DEB_FILE"
+
           mkdir -p fooyin-appdir
-          tar -xf data.tar.xz -C fooyin-appdir/
-          rm -f fooyin_latest.deb data.tar.xz control.tar.gz debian-binary
+
+          # Определяем, какой именно архив с данными внутри (.xz, .zst, .gz, ...)
+          DATA_TAR=$(ls data.tar.* | head -n 1)
+          echo "Распаковываем архив: $DATA_TAR"
+
+          tar -xf "$DATA_TAR" -C fooyin-appdir/
+
+          # Убираем мусор
+          rm -f "$DEB_FILE" control.tar.* debian-binary "$DATA_TAR"
+
 
       - name: Скачать AppImageTool
         run: |
