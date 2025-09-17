@@ -90,74 +90,65 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /opt/Qt
-          # Ключ кэша включает версию Qt, архитектуру и хэш build.yml для инвалидации при изменении настроек
-          key: qt-${{ runner.os }}-6.8.0-linux_gcc_64-${{ hashFiles('**/build.yml') }}
+          key: qt-${{ runner.os }}-6.8.0-gcc_64-${{ hashFiles('**/build.yml') }}
           restore-keys: |
-            qt-${{ runner.os }}-6.8.0-linux_gcc_64-
+            qt-${{ runner.os }}-6.8.0-gcc_64-
 
       - name: Install Qt 6.8.0 with aqtinstall
         id: install-qt
         run: |
           echo "=== Установка Qt 6.8.0 с помощью aqtinstall ==="
 
-          # Определить версию Qt и архитектуру
+          # Определить версию Qt и архитектуру для aqtinstall
           QT_VERSION="6.8.0"
-          QT_ARCH="linux_gcc_64" # Получено ранее через aqt list-qt
-          # Определить модули, необходимые для Fooyin, основываясь на анализе логов установки пакетов
-          # Из логов видно использование: qt6-qpa-plugins, qt6-gtk-platformtheme, qt6-wayland,
-          # и библиотек: libqt6core6t64, libqt6gui6t64, libqt6widgets6t64, libqt6network6t64,
-          # libqt6dbus6t64, libqt6qml6, libqt6quick6, libqt6multimedia6, libqt6opengl6t64,
-          # libqt6sql6 (для sqlite plugin), libqt6concurrent6t64.
-          # aqtinstall модуль 'qtbase' обычно включает Core, Gui, Widgets, Network, DBus, Concurrent, Sql.
-          # aqtinstall модуль 'qtmultimedia' добавляет Multimedia.
-          # aqtinstall модуль 'qt5compat' часто включает Qml/Quick.
-          # aqtinstall модуль 'qtshadertools' может быть нужен для QML.
-          # Wayland и GTK плагины могут требовать дополнительных модулей или устанавливаются отдельно,
-          # но основные библиотеки должны быть в qtbase и вышеуказанных модулях.
+          # ВАЖНО: Используем 'gcc_64' как имя каталога, которое создает aqtinstall,
+          # а не 'linux_gcc_64', которое возвращает команда list-qt
+          QT_ARCH_DIR="gcc_64"
+          # Имя архитектуры для команды aqt install-qt
+          QT_ARCH_INSTALL="linux_gcc_64"
+          
           QT_MODULES="qtmultimedia qt5compat qtshadertools"
 
-          # Проверить, существует ли каталог установки Qt (из кэша или предыдущей установки на этой машине)
-          QT_INSTALL_PATH="/opt/Qt/$QT_VERSION/$QT_ARCH"
+          # Построить путь установки
+          QT_INSTALL_PATH="/opt/Qt/$QT_VERSION/$QT_ARCH_DIR"
+          
           if [ -d "$QT_INSTALL_PATH" ] && [ -f "$QT_INSTALL_PATH/bin/qmake6" ]; then
-            echo "Qt $QT_VERSION ($QT_ARCH) найден в $QT_INSTALL_PATH (возможно из кэша или предыдущей установки). Пропуск установки aqtinstall."
+            echo "Qt $QT_VERSION ($QT_ARCH_DIR) найден в $QT_INSTALL_PATH (возможно из кэша или предыдущей установки). Пропуск установки aqtinstall."
             echo "cache-hit-local=true" >> $GITHUB_OUTPUT
           else
-            echo "Qt $QT_VERSION ($QT_ARCH) не найден в $QT_INSTALL_PATH. Начинаем установку с помощью aqtinstall."
+            echo "Qt $QT_VERSION ($QT_ARCH_DIR) не найден в $QT_INSTALL_PATH. Начинаем установку с помощью aqtinstall."
             echo "cache-hit-local=false" >> $GITHUB_OUTPUT
 
-            # 1. Установить aqtinstall (если еще не установлен)
             echo "Установка aqtinstall..."
             python3 -m pip install aqtinstall
 
-            # 2. Создать каталог для установки Qt и назначить права
             echo "Создание каталога /opt/Qt и назначение прав..."
             sudo mkdir -p /opt/Qt
             sudo chown $USER:$USER /opt/Qt
 
-            # 3. Установить Qt 6.8.0 с указанными модулями
-            echo "Установка Qt $QT_VERSION ($QT_ARCH) с модулями: $QT_MODULES"
-            INSTALL_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH -m $QT_MODULES -O /opt/Qt"
+            echo "Установка Qt $QT_VERSION ($QT_ARCH_INSTALL) с модулями: $QT_MODULES"
+            INSTALL_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH_INSTALL -m $QT_MODULES -O /opt/Qt"
             echo "Команда установки: $INSTALL_CMD"
             if $INSTALL_CMD; then
               echo "Установка Qt $QT_VERSION с модулями '$QT_MODULES' прошла успешно."
             else
               echo "::warning::Установка Qt $QT_VERSION с модулями '$QT_MODULES' не удалась. Пробуем установить только базовый Qt без дополнительных модулей..."
-              FALLBACK_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH -O /opt/Qt"
+              FALLBACK_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH_INSTALL -O /opt/Qt"
               echo "Команда установки (запасной вариант): $FALLBACK_CMD"
               if $FALLBACK_CMD; then
                 echo "Установка базового Qt $QT_VERSION прошла успешно."
               else
                 echo "::error::Критическая ошибка: Не удалось установить Qt $QT_VERSION ни с модулями, ни без них."
-                # Вывести список доступных модулей для отладки
-                echo "Доступные модули для Qt $QT_VERSION $QT_ARCH:"
-                aqt list-qt linux desktop --modules $QT_VERSION $QT_ARCH || echo "Не удалось получить список модулей."
+                echo "Доступные модули для Qt $QT_VERSION $QT_ARCH_INSTALL:"
+                aqt list-qt linux desktop --modules $QT_VERSION $QT_ARCH_INSTALL || echo "Не удалось получить список модулей."
                 exit 1
               fi
             fi
           fi
 
-          # 4. Проверить установку/наличие Qt
+          # Проверить установку/наличие Qt
           echo "=== Проверка установленного/закэшированного Qt 6.8.0 ==="
+          # Используем правильный путь QT_INSTALL_PATH, который указывает на gcc_64
           if [ -d "$QT_INSTALL_PATH/lib" ] && [ -f "$QT_INSTALL_PATH/bin/qmake6" ]; then
             echo "Каталог $QT_INSTALL_PATH/lib найден и qmake6 доступен."
             echo "Версия Qt (qmake6 -v):"
@@ -174,28 +165,35 @@ jobs:
             ls -la $QT_INSTALL_PATH/lib/libQt6OpenGL.so* 2>/dev/null || echo "  libQt6OpenGL.so* не найден"
             ls -la $QT_INSTALL_PATH/lib/libQt6Sql.so* 2>/dev/null || echo "  libQt6Sql.so* не найден"
             ls -la $QT_INSTALL_PATH/lib/libQt6Concurrent.so* 2>/dev/null || echo "  libQt6Concurrent.so* не найден"
-            # Проверить наличие некоторых плагинов (не все, но основные)
+            
             echo "Наличие ключевых плагинов (пример):"
-            ls $QT_INSTALL_PATH/plugins/platforms/libqxcb.so 2>/dev/null && echo "  Плагин XCB (libqxcb.so) найден" || echo "  Плагин XCB (libqxcb.so) не найден"
-            ls $QT_INSTALL_PATH/plugins/sqldrivers/libqsqlite.so 2>/dev/null && echo "  Плагин SQLite (libqsqlite.so) найден" || echo "  Плагин SQLite (libqsqlite.so) не найден"
+            if ls $QT_INSTALL_PATH/plugins/platforms/libqxcb.so >/dev/null 2>&1; then
+              echo "  Плагин XCB (libqxcb.so) найден"
+            else
+              echo "  Плагин XCB (libqxcb.so) не найден"
+            fi
+            if ls $QT_INSTALL_PATH/plugins/sqldrivers/libqsqlite.so >/dev/null 2>&1; then
+              echo "  Плагин SQLite (libqsqlite.so) найден"
+            else
+              echo "  Плагин SQLite (libqsqlite.so) не найден"
+            fi
           else
             echo "::error::Критическая ошибка: Каталог $QT_INSTALL_PATH/lib или qmake6 НЕ НАЙДЕН."
             echo "Содержимое /opt/Qt (если есть):"
             ls -la /opt/Qt/ 2>/dev/null || echo "  /opt/Qt пуст или не существует"
+            echo "Содержимое /opt/Qt/$QT_VERSION/ (если есть):"
+            ls -la /opt/Qt/$QT_VERSION/ 2>/dev/null || echo "  /opt/Qt/$QT_VERSION/ пуст или не существует"
             exit 1
           fi
           echo "=== Установка/проверка Qt 6.8.0 завершена ==="
 
       - name: Save Qt 6.8.0 Cache
-        # Сохранить кэш только если:
-        # 1. Кэш из GitHub Actions НЕ был восстановлен (cache-qt.outputs.cache-hit != 'true')
-        # 2. И Qt НЕ был найден локально (install-qt.outputs.cache-hit-local == 'false'), то есть действительно происходила установка
         if: steps.cache-qt.outputs.cache-hit != 'true' && steps.install-qt.outputs.cache-hit-local == 'false'
         uses: actions/cache/save@v3
         with:
           path: /opt/Qt
-          key: qt-${{ runner.os }}-6.8.0-linux_gcc_64-${{ hashFiles('**/build.yml') }}
-      # -----------------------          
+          key: qt-${{ runner.os }}-6.8.0-gcc_64-${{ hashFiles('**/build.yml') }}
+      # -----------------------         
 
 
 
