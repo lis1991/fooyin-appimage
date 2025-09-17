@@ -108,7 +108,7 @@ jobs:
           # Если потребуются другие модули (например, qtimageformats), их можно добавить сюда.
           # -O /opt/Qt: Указать каталог установки
           echo "Установка Qt 6.8.0 с помощью aqtinstall..."
-          aqt install-qt linux desktop 6.8.0 gcc_64 -m qtbase qtmultimedia qtdeclarative -O /opt/Qt
+          ###aqt install-qt linux desktop 6.8.0 gcc_64 -m qtbase qtmultimedia qtdeclarative -O /opt/Qt
 
           # 4. Проверить установку
           echo "Проверка установленных библиотек Qt 6.8.0:"
