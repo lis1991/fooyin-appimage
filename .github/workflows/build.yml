@@ -94,16 +94,11 @@ jobs:
           sudo chown $USER:$USER /opt/Qt # Дать текущему пользователю права на запись
 
 
-          # 3. Проверить доступные архитектуры для Qt 6.8.0
-          echo "Проверка доступных архитектур для Qt 6.8.0..."
+          echo
+          echo
           aqt list-qt linux desktop --arch 6.8.0
-
-          # 4. Выбрать архитектуру (обычно gcc_64 для Linux)
-          QT_ARCH="gcc_64"
-
-          # 5. Проверить доступные модули для Qt 6.8.0 и архитектуры
-          echo "Проверка доступных модулей для Qt 6.8.0 ($QT_ARCH)..."
-          aqt list-qt linux desktop --modules 6.8.0 $QT_ARCH
+          echo
+          echo
 
           
 
