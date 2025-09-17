@@ -219,10 +219,10 @@ jobs:
           echo "Копирование библиотек Qt 6.8.0 из $QT_INSTALL_PATH/lib в AppDir/usr/lib..."
           cp -v $QT_INSTALL_PATH/lib/libQt6*.so.* AppDir/usr/lib/ 2>&1 | grep -E '(copied|скопировано)' || echo "Копирование завершено (возможны сообщения о перезаписи или отсутствии английского вывода)."
 
-          # Проверить, что ключевые библиотеки теперь находятся в AppDir
-          echo "Проверка наличия ключевых библиотек Qt 6.8.0 в AppDir после копирования:"
-          ls -l AppDir/usr/lib/libQt6Core.so* AppDir/usr/lib/libQt6Gui.so* AppDir/usr/lib/libQt6Widgets.so* AppDir/usr/lib/libQt6Network.so* 2>/dev/null || echo "Некоторые библиотеки не найдены в AppDir/usr/lib/ (возможно, они будут скопированы позже copy_deps или не обязательны)"
-
+          # Проверить, что библиотеки Qt 6.8.0 теперь находятся в AppDir/usr/lib
+          echo "Проверка наличия скопированных библиотек Qt 6.8.0 в AppDir/usr/lib:"
+          ls -la AppDir/usr/lib/libQt6*.so.* 2>/dev/null || echo "Библиотеки Qt6 не найдены в AppDir/usr/lib/"
+          
           echo "=== Копирование Qt 6.8.0 завершено ==="
       # -----------------------
 
