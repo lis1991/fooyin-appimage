@@ -2,7 +2,7 @@ name: Watch Fooyin Releases
 
 on:
   schedule:
-    - cron: '0 * * * *' # Проверять каждый час
+    - cron: '0 4 * * 0' # Каждое воскресенье в 4:00 утра
   workflow_dispatch:
 
 jobs:
