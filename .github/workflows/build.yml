@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       QT_VERSION: "6.8.0"
-      FFMPEG_VERSION: "7.0.2"
+      FFMPEG_VERSION: "7.1.2"
       BUILD_DIR: ${{ github.workspace }}/build
       INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
       FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
