@@ -108,6 +108,7 @@ jobs:
           # Клонируем репозиторий TagLib
           git clone https://github.com/taglib/taglib.git
           cd taglib
+          git submodule update --init
           # Можно добавить git checkout <конкретный_стабильный_тег>, если нужно
           # Например: git checkout v2.0  (проверьте актуальный тег на GitHub)
           
