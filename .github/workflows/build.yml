@@ -99,7 +99,10 @@ jobs:
           aqt list-qt linux desktop --arch 6.8.0
           echo
           echo
-
+          aqt list-qt linux desktop --modules 6.8.0 linux_gcc_64
+          echo
+          echo
+          
           
 
 
