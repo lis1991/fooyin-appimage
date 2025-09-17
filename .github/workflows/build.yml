@@ -28,11 +28,9 @@ jobs:
         id: determine-tag
         run: |
           if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
-            # Получаем тег из payload события
             TAG="${{ github.event.client_payload.release.tag_name }}"
             echo "Using tag from repository_dispatch: $TAG"
           else
-            # Для ручного запуска используем input
             TAG="${{ github.event.inputs.fooyin-tag }}"
             echo "Using tag from workflow_dispatch: $TAG"
           fi
@@ -190,4 +188,3 @@ EOF
             Built from: https://github.com/fooyin/fooyin/releases/tag/${{ env.TAG }}
           files: Fooyin-*.AppImage
           prerelease: false
-          make_latest: true
