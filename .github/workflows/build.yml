@@ -82,6 +82,16 @@ jobs:
         run: |
           cp -r fooyin-appdir/usr/* AppDir/usr/
 
+      # -----------------------
+      # Копировать libc (если необходимо)
+      - name: Copy libc to AppDir
+        run: |
+          echo "=== Копирование libc в AppDir ==="
+          mkdir -p AppDir/usr/lib
+          cp /lib/x86_64-linux-gnu/libc.so.6 AppDir/usr/lib/
+          echo "libc.so.6 скопирован:"
+          ls -l AppDir/usr/lib/libc.so.6
+      # -----------------------
           
       # -----------------------
       # Установка Qt 6.8.0 с помощью aqtinstall с кэшированием
