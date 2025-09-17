@@ -1,0 +1,44 @@
+name: Watch Fooyin Releases
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Проверять каждый час
+  workflow_dispatch:
+
+jobs:
+  check-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest Fooyin release
+        id: check-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: 'fooyin',
+              repo: 'fooyin'
+            });
+            
+            if (releases.length > 0) {
+              const latestRelease = releases[0];
+              console.log('Latest Fooyin release:', latestRelease.tag_name);
+              
+              // Триггерим сборку AppImage
+              await github.rest.repos.createDispatchEvent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                event_type: 'fooyin-release',
+                client_payload: {
+                  release: {
+                    tag_name: latestRelease.tag_name,
+                    html_url: latestRelease.html_url
+                  }
+                }
+              });
+              
+              return latestRelease.tag_name;
+            }
+            return null;
+
+      - name: Log result
+        run: echo "Triggered build for release: ${{ steps.check-release.outputs.result }}"
