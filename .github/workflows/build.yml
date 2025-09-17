@@ -85,6 +85,65 @@ jobs:
           cp -r fooyin-appdir/usr/* AppDir/usr/
 
       # -----------------------
+      # Кэшируем сборку TagLib из Git
+      - name: Cache TagLib Git Build
+        id: cache-taglib
+        uses: actions/cache@v3
+        with:
+          path: ~/taglib_build
+          # Используем фиксированный ключ, пока не добавим динамическое определение версии
+          key: taglib-git-tip-${{ runner.os }}
+
+      # -----------------------
+      # Сборка TagLib из Git, если кеш пустой
+      - name: Build TagLib from Git
+        if: steps.cache-taglib.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          # Устанавливаем зависимости для сборки TagLib
+          # cmake и g++ должны быть уже установлены, но перестрахуемся
+          sudo apt-get install -y build-essential cmake git
+
+          mkdir -p ~/taglib_build_source && cd ~/taglib_build_source
+          # Клонируем репозиторий TagLib
+          git clone https://github.com/taglib/taglib.git
+          cd taglib
+          # Можно добавить git checkout <конкретный_стабильный_тег>, если нужно
+          # Например: git checkout v2.0  (проверьте актуальный тег на GitHub)
+          
+          # Создаем директорию для сборки
+          mkdir build && cd build
+          # Конфигурируем сборку с помощью CMake
+          # Устанавливаем префикс в ~/taglib_build
+          # -DCMAKE_BUILD_TYPE=Release для оптимизированной сборки
+          # -DBUILD_SHARED_LIBS=ON чтобы собирать shared libraries (.so)
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/taglib_build -DBUILD_SHARED_LIBS=ON
+          # Собираем
+          make -j$(nproc)
+          # Устанавливаем в ~/taglib_build
+          make install
+
+      # -----------------------
+      # Копируем библиотеки TagLib в AppDir
+      - name: Copy TagLib libs to AppDir
+        run: |
+          echo "=== Копирование библиотек TagLib из Git-сборки ==="
+          if [ -d "$HOME/taglib_build/lib" ]; then
+            echo "Найден каталог библиотек: $HOME/taglib_build/lib"
+            mkdir -p AppDir/usr/lib
+            # Копируем все .so файлы из каталога lib
+            cp -v $HOME/taglib_build/lib/*.so* AppDir/usr/lib/
+            
+            echo "Файлы TagLib в AppDir/usr/lib/ после копирования:"
+            ls -la AppDir/usr/lib/libtag* 2>/dev/null || echo "Файлы libtag* не найдены в AppDir/usr/lib/"
+          else
+            echo "::warning::Каталог $HOME/taglib_build/lib не найден. Возможно, сборка не удалась или установилась в другое место."
+            echo "Проверяем возможные альтернативные пути..."
+            find $HOME/taglib_build -name "libtag*" 2>/dev/null || echo "Файлы libtag* не найдены в $HOME/taglib_build"
+          fi
+      # -----------------------
+      
+      # -----------------------
       # Скачиваем и распаковываем готовую сборку ICU 76.1 для Ubuntu 22.04
       - name: Download and Extract ICU 76.1 (Ubuntu 22.04)
         run: |
