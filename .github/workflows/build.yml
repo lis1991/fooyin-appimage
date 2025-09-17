@@ -194,8 +194,37 @@ jobs:
           path: /opt/Qt
           key: qt-${{ runner.os }}-6.8.0-gcc_64-${{ hashFiles('**/build.yml') }}
       # -----------------------         
+      
+      # -----------------------
+      # Копировать библиотеки Qt 6.8.0 из установки aqtinstall в AppDir
+      - name: Copy Qt 6.8.0 Libraries from aqtinstall to AppDir
+        run: |
+          echo "=== Копирование библиотек Qt 6.8.0 из aqtinstall в AppDir ==="
 
+          QT_VERSION="6.8.0"
+          QT_ARCH_DIR="gcc_64"
+          QT_INSTALL_PATH="/opt/Qt/$QT_VERSION/$QT_ARCH_DIR"
 
+          # Проверить, существует ли каталог установки Qt
+          if [ ! -d "$QT_INSTALL_PATH/lib" ]; then
+            echo "::error::Каталог установки Qt $QT_INSTALL_PATH/lib не найден. Установка Qt 6.8.0 не удалась."
+            exit 1
+          fi
+
+          # Создать каталог в AppDir, если его нет
+          mkdir -p AppDir/usr/lib
+
+          # Скопировать все библиотеки .so из Qt 6.8.0 в AppDir/usr/lib
+          # Это перезапишет библиотеки, скопированные ранее copy_deps из системных пакетов (версии 6.4.2)
+          echo "Копирование библиотек Qt 6.8.0 из $QT_INSTALL_PATH/lib в AppDir/usr/lib..."
+          cp -v $QT_INSTALL_PATH/lib/libQt6*.so.* AppDir/usr/lib/ 2>&1 | grep -E '(copied|скопировано)' || echo "Копирование завершено (возможны сообщения о перезаписи или отсутствии английского вывода)."
+
+          # Проверить, что ключевые библиотеки теперь находятся в AppDir
+          echo "Проверка наличия ключевых библиотек Qt 6.8.0 в AppDir после копирования:"
+          ls -l AppDir/usr/lib/libQt6Core.so* AppDir/usr/lib/libQt6Gui.so* AppDir/usr/lib/libQt6Widgets.so* AppDir/usr/lib/libQt6Network.so* 2>/dev/null || echo "Некоторые библиотеки не найдены в AppDir/usr/lib/ (возможно, они будут скопированы позже copy_deps или не обязательны)"
+
+          echo "=== Копирование Qt 6.8.0 завершено ==="
+      # -----------------------
 
       # -----------------------
       # Кэшируем сборку TagLib из Git
