@@ -226,6 +226,32 @@ jobs:
           echo "=== Копирование Qt 6.8.0 завершено ==="
       # -----------------------
 
+
+      # -----------------------
+      # Скачиваем и распаковываем готовую сборку ICU для Ubuntu 22.04
+      - name: Download and Extract ICU (Ubuntu 22.04)
+        run: |
+          echo "=== Скачивание ICU ==="
+          wget https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-Ubuntu22.04-x64.tgz
+          echo "=== Распаковка ICU ==="
+          tar xzf icu4c-73_2-Ubuntu22.04-x64.tgz
+          echo "=== Копирование библиотек ICU в AppDir ==="
+          mkdir -p AppDir/usr/lib
+          # Предполагаем, что библиотеки находятся в подкаталоге lib после распаковки
+          echo
+          ls -la
+          echo
+          ls -la ./icu/usr/local/lib/
+          echo
+          cp ./icu/usr/local/lib/*.* AppDir/usr/lib/
+    
+          echo "Файлы ICU в AppDir/usr/lib/ после копирования:"
+          ls -la AppDir/usr/lib/libicu* 2>/dev/null || echo "Файлы libicu* не найдены в AppDir/usr/lib/"
+    
+          # Удаляем временные файлы
+          rm -rf icu4c-73_2-Ubuntu22.04-x64*
+      # -----------------------
+
       # -----------------------
       # Кэшируем сборку TagLib из Git
       - name: Cache TagLib Git Build
