@@ -108,19 +108,7 @@ jobs:
           wget -q https://download.qt.io/archive/qt/6.8/$QT_VERSION/single/qt-everywhere-src-$QT_VERSION.tar.xz
           tar xf qt-everywhere-src-$QT_VERSION.tar.xz
           cd qt-everywhere-src-$QT_VERSION
-          ./configure -prefix $INSTALL_PREFIX \
-            -opensource -confirm-license \
-            -nomake examples -nomake tests \
-            -skip qtwebengine \
-            -system-zlib -system-libpng -system-libjpeg \
-            -no-rpath \
-            -shared \
-            -I $INSTALL_PREFIX/include \
-            -L $INSTALL_PREFIX/lib \
-            -- \
-            -DFEATURE_ffmpeg=ON \
-            -DFFMPEG_ROOT=$INSTALL_PREFIX \
-            -GNinja
+          ./configure -prefix $INSTALL_PREFIX -opensource -confirm-license -nomake examples -nomake tests -skip qtwebengine -system-zlib -system-libpng -system-libjpeg -no-rpath -shared -I $INSTALL_PREFIX/include -L $INSTALL_PREFIX/lib -- -DFEATURE_ffmpeg=ON -DFFMPEG_ROOT=$INSTALL_PREFIX -GNinja
           ninja
           ninja install
 
