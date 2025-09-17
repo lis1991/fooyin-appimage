@@ -83,6 +83,77 @@ jobs:
           cp -r fooyin-appdir/usr/* AppDir/usr/
 
       # -----------------------
+      # Установка Qt 6.8.0 с помощью aqtinstall
+      - name: Install Qt 6.8.0 with aqtinstall
+        run: |
+          # 1. Установить aqtinstall
+          python3 -m pip install aqtinstall
+
+          # 2. Создать каталог для установки Qt
+          sudo mkdir -p /opt/Qt
+          sudo chown $USER:$USER /opt/Qt # Дать текущему пользователю права на запись
+
+          # 3. Установить Qt 6.8.0 для Linux Desktop gcc_64
+          # -m qtbase qtmultimedia qtdeclarative: Установить основные модули, мультимедиа и QML/Quick,
+          # которые, судя по логам, используются Fooyin.
+          # Если потребуются другие модули (например, qtimageformats), их можно добавить сюда.
+          # -O /opt/Qt: Указать каталог установки
+          echo "Установка Qt 6.8.0 с помощью aqtinstall..."
+          aqt install-qt linux desktop 6.8.0 gcc_64 -m qtbase qtmultimedia qtdeclarative -O /opt/Qt
+
+          # 4. Проверить установку
+          echo "Проверка установленных библиотек Qt 6.8.0:"
+          if [ -d "/opt/Qt/6.8.0/gcc_64/lib" ]; then
+            echo "Каталог /opt/Qt/6.8.0/gcc_64/lib найден."
+            ls -la /opt/Qt/6.8.0/gcc_64/lib/libQt6Core.so*
+            echo "Содержимое каталога lib (первые 10 библиотек):"
+            ls /opt/Qt/6.8.0/gcc_64/lib/ | grep "\.so" | head -n 10
+          else
+            echo "::error::Каталог /opt/Qt/6.8.0/gcc_64/lib НЕ НАЙДЕН. Установка aqtinstall могла не удалась."
+            exit 1
+          fi
+
+          # 5. (Опционально) Создать символическую ссылку для удобства
+          # Это может помочь, если другие части скрипта ожидают путь /opt/Qt6.8.0
+          # ln -sf /opt/Qt/6.8.0 /opt/Qt6.8.0
+      # -----------------------
+
+      # -----------------------
+      # Копировать библиотеки Qt 6.8.0 из установки aqtinstall в AppDir
+      - name: Copy Qt 6.8.0 Libraries from aqtinstall to AppDir
+        run: |
+          echo "=== Копирование библиотек Qt 6.8.0 из aqtinstall в AppDir ==="
+          
+          # Проверить, существует ли каталог установки Qt 6.8.0 от aqtinstall
+          if [ ! -d "/opt/Qt/6.8.0/gcc_64/lib" ]; then
+            echo "::error::Каталог /opt/Qt/6.8.0/gcc_64/lib не найден. Установка Qt 6.8.0 с aqtinstall могла не удалась."
+            exit 1
+          fi
+          
+          # Создать каталог в AppDir, если его нет
+          mkdir -p AppDir/usr/lib
+          
+          # Скопировать все библиотеки .so из Qt 6.8.0 в AppDir/usr/lib
+          # Это перезапишет библиотеки, скопированные ранее copy_deps из системных пакетов (версии 6.4.2)
+          echo "Копирование библиотек Qt 6.8.0 из /opt/Qt/6.8.0/gcc_64/lib в AppDir/usr/lib..."
+          cp -v /opt/Qt/6.8.0/gcc_64/lib/libQt6*.so.* AppDir/usr/lib/ 2>&1 | grep -E '(copied|скопировано)' || echo "Копирование завершено (возможны сообщения о перезаписи или отсутствии английского вывода)."
+          
+          # Также скопировать плагины и QML, если они понадобятся (обычно они уже копируются copy_deps,
+          # но если вы хотите быть уверенным, что используются именно плагины от Qt 6.8.0)
+          # echo "Копирование плагинов Qt 6.8.0 (если нужно перезаписать системные)..."
+          # mkdir -p AppDir/usr/lib/qt6
+          # cp -rv /opt/Qt/6.8.0/gcc_64/plugins AppDir/usr/lib/qt6/ 2>/dev/null || echo "Плагины Qt 6.8.0 не найдены или ошибка копирования."
+          
+          # echo "Копирование QML Qt 6.8.0 (если нужно перезаписать системные)..."
+          # cp -rv /opt/Qt/6.8.0/gcc_64/qml AppDir/usr/lib/qt6/ 2>/dev/null || echo "QML Qt 6.8.0 не найдены или ошибка копирования."
+          
+          echo "Проверка наличия ключевых библиотек Qt 6.8.0 в AppDir:"
+          ls -l AppDir/usr/lib/libQt6Core.so* AppDir/usr/lib/libQt6Gui.so* AppDir/usr/lib/libQt6Widgets.so* 2>/dev/null || echo "Некоторые библиотеки не найдены в AppDir/usr/lib/"
+          
+          echo "=== Копирование Qt 6.8.0 завершено ==="
+      # -----------------------
+
+      # -----------------------
       # Кэшируем сборку TagLib из Git
       - name: Cache TagLib Git Build
         id: cache-taglib
