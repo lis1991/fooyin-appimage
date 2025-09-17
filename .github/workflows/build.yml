@@ -1,196 +1,143 @@
-name: Build AppImage
+name: Build Fooyin AppImage on Release
+
 on:
-  push:
-    tags:
-      - 'v*'
+  repository_dispatch:
+    types: [fooyin-release]
   workflow_dispatch:
+    inputs:
+      fooyin-tag:
+        description: 'Fooyin Git tag (e.g., v0.9.1)'
+        required: true
+        default: 'v0.9.1'
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Используем 22.04 для совместимости
+    runs-on: ubuntu-22.04
     env:
-      # Определяем версии для сборки
       QT_VERSION: "6.8.0"
-      FFMPEG_VERSION: "7.0.2" # Или другая 7.x
-      # Определяем пути
+      FFMPEG_VERSION: "7.1.2"
       BUILD_DIR: ${{ github.workspace }}/build
       INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
-      # Определяем целевую директорию для исходников Fooyin
-      FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin-source
-    steps:
-      # --- Удален оригинальный actions/checkout@v4 для Fooyin ---
+      FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
 
+    steps:
       - name: Checkout this repo (for recipe.yml)
-        # Этот шаг нужен, если recipe.yml находится в том же репозитории,
-        # из которого запускается workflow (например, для хранения рецептов).
+        uses: actions/checkout@v4
+
+      - name: Determine Fooyin tag
+        id: determine-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            # Получаем тег из payload события
+            TAG="${{ github.event.client_payload.release.tag_name }}"
+            echo "Using tag from repository_dispatch: $TAG"
+          else
+            # Для ручного запуска используем input
+            TAG="${{ github.event.inputs.fooyin-tag }}"
+            echo "Using tag from workflow_dispatch: $TAG"
+          fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Checkout Fooyin source
         uses: actions/checkout@v4
         with:
-           # Если recipe.yml в другой ветке или пути, можно указать
-           # ref: your-branch-name
-           # path: path/to/recipe
+          repository: fooyin/fooyin
+          ref: ${{ env.TAG }}
+          path: ${{ env.FOYIN_SOURCE_DIR }}
+
+      - name: Setup CI Environment
+        run: |
+          mkdir -p ${{ env.BUILD_DIR }}
+          mkdir -p ${{ env.INSTALL_PREFIX }}
+
+      - name: Cache Qt and FFmpeg build
+        uses: actions/cache@v4
+        id: build-cache
+        with:
+          path: |
+            ${{ env.INSTALL_PREFIX }}
+            ${{ env.BUILD_DIR }}/qt-everywhere-src-${{ env.QT_VERSION }}
+            ${{ env.BUILD_DIR }}/ffmpeg-${{ env.FFMPEG_VERSION }}
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-${{ hashFiles('**/recipe.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-
 
       - name: Set up Python
+        if: steps.build-cache.outputs.cache-hit != 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Или другая подходящая версия
+          python-version: '3.10'
 
       - name: Install appimage-builder
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           pip install appimage-builder
 
-      - name: Install system dependencies for building
-        # Устанавливаем зависимости, необходимые для сборки Qt, FFmpeg и Fooyin
+      - name: Install system dependencies
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            cmake \
-            git \
-            pkg-config \
-            wget \
-            libgl1-mesa-dev \
-            libxcb1-dev \
-            libx11-dev \
-            libx11-xcb-dev \
-            libxext-dev \
-            libxfixes-dev \
-            libxi-dev \
-            libxrender-dev \
-            libxrandr-dev \
-            libxcursor-dev \
-            libxinerama-dev \
-            libxss-dev \
-            libglib2.0-dev \
-            libicu-dev \
-            libzstd-dev \
-            libbz2-dev \
-            liblzma-dev \
-            libva-dev \
-            libvdpau-dev \
-            libvorbis-dev \
-            libopus-dev \
-            libmp3lame-dev \
-            libfdk-aac-dev \
-            yasm \
-            nasm
+            build-essential cmake git pkg-config wget ninja-build \
+            libgl1-mesa-dev libxcb1-dev libx11-dev libx11-xcb-dev \
+            libxext-dev libxfixes-dev libxi-dev libxrender-dev \
+            libxrandr-dev libxcursor-dev libxinerama-dev libxss-dev \
+            libglib2.0-dev libicu-dev libzstd-dev libbz2-dev liblzma-dev \
+            libva-dev libvdpau-dev libvorbis-dev libopus-dev \
+            libmp3lame-dev libfdk-aac-dev yasm nasm
 
-      - name: Create directories
-        run: |
-          mkdir -p ${{ env.BUILD_DIR }}
-          mkdir -p ${{ env.INSTALL_PREFIX }}/lib
-          mkdir -p ${{ env.INSTALL_PREFIX }}/bin
-          mkdir -p ${{ env.INSTALL_PREFIX }}/share
-
-      - name: Download, build and install FFmpeg 7.x
+      - name: Build and install FFmpeg
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          # Скачиваем исходный код FFmpeg
-          wget https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           cd ffmpeg-${{ env.FFMPEG_VERSION }}
-          # Конфигурируем сборку
-          # --prefix указывает, куда устанавливать
-          # --enable-shared создает разделяемые библиотеки
-          # --disable-static отключает статическую сборку
-          # --disable-doc отключает сборку документации
-          # --enable-pic необходимо для правильной работы с Qt
           ./configure \
             --prefix=${{ env.INSTALL_PREFIX }} \
             --enable-shared \
             --disable-static \
             --disable-doc \
             --enable-pic
-          # Собираем
           make -j$(nproc)
-          # Устанавливаем в $INSTALL_PREFIX
           make install
 
-      - name: Download, build and install Qt 6.8.0
+      - name: Build and install Qt
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          # Скачиваем исходный код Qt
-          wget https://download.qt.io/archive/qt/${{ env.QT_VERSION | split: '.' | first }}.${{ env.QT_VERSION | split: '.' | slice: 1, 1 | join: '.' }}/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
-          tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
-          cd qt-everywhere-src-${{ env.QT_VERSION }}
-          
-          # Конфигурируем сборку Qt
-          # -prefix указывает путь установки
-          # -opensource и -confirm-license принимают лицензию
-          # -nomake examples/tests ускоряет сборку
-          # -skip пропускает ненужные модули
-          # -system-<lib> использует системные библиотеки
-          # -no-rpath не встраивает пути к библиотекам (мы будем управлять LD_LIBRARY_PATH)
-          # -shared создает разделяемые библиотеки
-          # -I и -L указывают пути к заголовкам и библиотекам FFmpeg
-          ./configure -prefix ${{ env.INSTALL_PREFIX }} \
+          wget -q https://download.qt.io/archive/qt/6.8/$QT_VERSION/single/qt-everywhere-src-$QT_VERSION.tar.xz
+          tar xf qt-everywhere-src-$QT_VERSION.tar.xz
+          cd qt-everywhere-src-$QT_VERSION
+          ./configure -prefix $INSTALL_PREFIX \
             -opensource -confirm-license \
             -nomake examples -nomake tests \
             -skip qtwebengine \
             -system-zlib -system-libpng -system-libjpeg \
             -no-rpath \
             -shared \
-            -I ${{ env.INSTALL_PREFIX }}/include \
-            -L ${{ env.INSTALL_PREFIX }}/lib \
+            -I $INSTALL_PREFIX/include \
+            -L $INSTALL_PREFIX/lib \
             -- \
             -DFEATURE_ffmpeg=ON \
-            -DFFMPEG_ROOT=${{ env.INSTALL_PREFIX }}
-          
-          # Собираем Qt (это займет очень много времени!)
-          cmake --build . --parallel
-          # Устанавливаем Qt
-          cmake --install .
-
-      - name: Checkout Fooyin release source code
-        run: |
-          # Определяем тег для checkout
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Если workflow запущен по тегу, используем этот тег
-            FOYIN_TAG=${GITHUB_REF#refs/tags/} # Убираем refs/tags/, остается v0.9.1
-            echo "Checking out Fooyin tag: $FOYIN_TAG"
-          else
-            # Если запуск не по тегу (например, workflow_dispatch)
-            # Можно использовать значение по умолчанию или input (если добавлен)
-            # FOYIN_TAG="v0.9.1" # Значение по умолчанию
-            # Или если добавлен input:
-            # FOYIN_TAG="v${{ github.event.inputs.version }}"
-            # Для простоты, используем последний релизный тег
-            echo "Not triggered by a tag push. Fetching latest release tag..."
-            FOYIN_TAG=$(git ls-remote --tags https://github.com/fooyin/fooyin.git | grep -v '{}\|-' | tail -n 1 | awk '{print $2}' | sed 's|refs/tags/||')
-            if [ -z "$FOYIN_TAG" ]; then
-              echo "Error: Could not determine latest Fooyin release tag."
-              exit 1
-            fi
-            echo "Determined latest Fooyin release tag: $FOYIN_TAG"
-          fi
-          
-          # Клонируем репозиторий в указанную директорию
-          git clone https://github.com/fooyin/fooyin.git ${{ env.FOYIN_SOURCE_DIR }}
-          cd ${{ env.FOYIN_SOURCE_DIR }}
-          
-          # Переключаемся на нужный тег
-          git checkout "$FOYIN_TAG"
-          
-          # Проверяем текущий коммит
-          echo "Checked out commit: $(git rev-parse HEAD)"
-          echo "Commit message: $(git log --oneline -1)"
+            -DFFMPEG_ROOT=$INSTALL_PREFIX \
+            -GNinja
+          ninja
+          ninja install
 
       - name: Build Fooyin
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
-          mkdir build
-          cd build
-          # Указываем CMake пути к нашим собранным Qt и FFmpeg
-          # CMAKE_PREFIX_PATH помогает найти Qt и FFmpeg
+          mkdir -p build && cd build
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
-            -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }}
-          make -j$(nproc)
-          # Устанавливаем Fooyin в префикс
-          make install
+            -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --parallel --target install
 
-      - name: Create desktop file and icon
+      - name: Prepare AppDir (Desktop file and icon)
         run: |
-          # Создаем десктоп-файл
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
           cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<EOF
 [Desktop Entry]
@@ -199,59 +146,48 @@ Exec=fooyin %F
 Type=Application
 Icon=fooyin
 Categories=AudioVideo;Player;
+Comment=A customisable music player
 MimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;
 EOF
-          
-          # Копируем иконку (предполагаем, что она есть в репозитории)
-          # Вам нужно будет указать правильный путь к иконке в вашем проекте
-          mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
-          # Пример: cp ${{ env.FOYIN_SOURCE_DIR }}/path/to/your/fooyin-icon.png ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-          # Если иконки нет, создайте заглушку или пропустите этот шаг
-          # touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-          # Или попробуем найти её автоматически
-          ICON_PATH=$(find ${{ env.FOYIN_SOURCE_DIR }} -name "fooyin.png" -type f | head -n 1)
-          if [ -n "$ICON_PATH" ]; then
-              cp "$ICON_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/
-              echo "Icon copied from $ICON_PATH"
+          ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
+          if [ -f "$ICON_SRC_PATH" ]; then
+            mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+            cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           else
-              echo "Warning: Fooyin icon not found. AppImage might not have an icon."
-              # Создаем пустой файл для избежания ошибок в appimage-builder
-              touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+            echo "WARNING: Icon not found at $ICON_SRC_PATH. AppImage will lack an icon."
           fi
 
-      - name: Set Version Environment Variable
+      - name: Clean version from tag
+        id: clean-version
         run: |
-          # Получаем версию из тега Git или из переменной окружения
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-          else
-            # Для workflow_dispatch или других случаев, пытаемся получить версию из тега исходников
-            cd ${{ env.FOYIN_SOURCE_DIR }}
-            # Простой способ: попробовать получить тег текущего коммита
-            CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "dev")
-            if [ "$CURRENT_TAG" != "dev" ]; then
-                # Убираем 'v' в начале, если есть
-                VERSION_CLEAN=${CURRENT_TAG#v}
-                echo "VERSION=$VERSION_CLEAN" >> $GITHUB_ENV
-            else
-                # Если нет тега, используем "dev" или другое значение по умолчанию
-                echo "VERSION=dev" >> $GITHUB_ENV
-            fi
-          fi
-          echo "Set VERSION to '${{ env.VERSION }}'"
+          CLEAN_VERSION=${TAG#v}
+          echo "VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build AppImage with appimage-builder
+      - name: Build AppImage
         run: |
-          # appimage-builder использует переменные окружения
-          # Передаем версию в appimage-builder
           export VERSION=${{ env.VERSION }}
-          # Запускаем appimage-builder
-          # Предполагаем, что recipe.yml находится в корне репозитория,
-          # из которого запускается этот workflow.
           appimage-builder --recipe recipe.yml --skip-test
 
-      - name: Upload AppImage artifact
+      - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Fooyin-AppImage
-          path: '*.AppImage*'
+          name: Fooyin-AppImage-${{ env.VERSION }}
+          path: Fooyin-*.AppImage
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG }}-appimage
+          name: "Fooyin ${{ env.TAG }} (AppImage)"
+          body: |
+            Automatic AppImage build for Fooyin ${{ env.TAG }}
+
+            **Includes:**
+            - Qt ${{ env.QT_VERSION }}
+            - FFmpeg ${{ env.FFMPEG_VERSION }}
+
+            Built from: https://github.com/fooyin/fooyin/releases/tag/${{ env.TAG }}
+          files: Fooyin-*.AppImage
+          prerelease: false
+          make_latest: true
