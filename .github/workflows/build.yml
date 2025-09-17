@@ -1,505 +1,257 @@
-name: Сборка Fooyin AppImage (автоматически)
-
+name: Build AppImage
 on:
-  schedule:
-    - cron: '0 4 * * 0'  # Каждое воскресенье в 04:00 UTC
   push:
-    branches:
-      - main
     tags:
-      - 'v*' # Также собирать при новом теге (например, v1.2.3)
-
-permissions:
-  contents: write   # нужно для создания релизов
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  build-appimage:
-    runs-on: ubuntu-24.04
+  build:
+    runs-on: ubuntu-22.04 # Используем 22.04 для совместимости
+    env:
+      # Определяем версии для сборки
+      QT_VERSION: "6.8.0"
+      FFMPEG_VERSION: "7.0.2" # Или другая 7.x
+      # Определяем пути
+      BUILD_DIR: ${{ github.workspace }}/build
+      INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
+      # Определяем целевую директорию для исходников Fooyin
+      FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin-source
     steps:
-      - name: Клонировать репозиторий
+      # --- Удален оригинальный actions/checkout@v4 для Fooyin ---
+
+      - name: Checkout this repo (for recipe.yml)
+        # Этот шаг нужен, если recipe.yml находится в том же репозитории,
+        # из которого запускается workflow (например, для хранения рецептов).
         uses: actions/checkout@v4
+        with:
+           # Если recipe.yml в другой ветке или пути, можно указать
+           # ref: your-branch-name
+           # path: path/to/recipe
 
-      - name: Установить зависимости
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Или другая подходящая версия
+
+      - name: Install appimage-builder
+        run: |
+          pip install appimage-builder
+
+      - name: Install system dependencies for building
+        # Устанавливаем зависимости, необходимые для сборки Qt, FFmpeg и Fooyin
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget curl jq binutils tar file libfuse2 \
-            libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
-            libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 \
-            libexpat1 libfontconfig1 libgbm1 libgl1 \
-            libgtk-3-0 libpango-1.0-0 libx11-6 libxcb1 \
-            libxcomposite1 libxdamage1 libxext6 libxfixes3 \
-            libxrandr2 libxrender1 libasound2t64 libatspi2.0-0 \
-            libstdc++6
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            wget \
+            libgl1-mesa-dev \
+            libxcb1-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxi-dev \
+            libxrender-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libxss-dev \
+            libglib2.0-dev \
+            libicu-dev \
+            libzstd-dev \
+            libbz2-dev \
+            liblzma-dev \
+            libva-dev \
+            libvdpau-dev \
+            libvorbis-dev \
+            libopus-dev \
+            libmp3lame-dev \
+            libfdk-aac-dev \
+            yasm \
+            nasm
 
-
-      - name: Скачать последний .deb пакет Fooyin
-        id: download-deb
+      - name: Create directories
         run: |
-          echo "🔍 Поиск последнего релиза Fooyin..."
-          LATEST_TAG=$(curl -s "https://api.github.com/repos/fooyin/fooyin/releases/latest" | jq -r '.tag_name')
-          DEB_URL="https://github.com/fooyin/fooyin/releases/download/${LATEST_TAG}/fooyin_${LATEST_TAG#v}-plucky_amd64.deb"
-          echo "📥 Скачивание: $DEB_URL"
-          wget -O fooyin_latest.deb "$DEB_URL"
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-          echo "DEB_URL=$DEB_URL" >> $GITHUB_ENV
-          echo "✅ Успешно скачано: $LATEST_TAG"
+          mkdir -p ${{ env.BUILD_DIR }}
+          mkdir -p ${{ env.INSTALL_PREFIX }}/lib
+          mkdir -p ${{ env.INSTALL_PREFIX }}/bin
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share
 
-      - name: 📦 Распаковка .deb файла
+      - name: Download, build and install FFmpeg 7.x
         run: |
-          echo "📦 Распаковка .deb файла..."
-          # Находим скачанный .deb
-          DEB_FILE=$(ls *.deb | head -n 1)
-          echo "Найден пакет: $DEB_FILE"
-
-          # Распаковываем содержимое deb (ar-архив)
-          ar x "$DEB_FILE"
-
-          mkdir -p fooyin-appdir
-
-          # Определяем, какой именно архив с данными внутри (.xz, .zst, .gz, ...)
-          DATA_TAR=$(ls data.tar.* | head -n 1)
-          echo "Распаковываем архив: $DATA_TAR"
-
-          tar -xf "$DATA_TAR" -C fooyin-appdir/
-
-          # Убираем мусор
-          rm -f "$DEB_FILE" control.tar.* debian-binary "$DATA_TAR"
-
-
-      - name: Скачать AppImageTool
-        run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-
-      - name: Создать структуру AppDir
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/lib
-          mkdir -p AppDir/usr/share
-          mkdir -p AppDir/usr/lib/x86_64-linux-gnu
-
-      - name: Скопировать файлы из .deb в AppDir
-        run: |
-          cp -r fooyin-appdir/usr/* AppDir/usr/
-
-
-          
-      # -----------------------
-      # Установка Qt 6.8.0 с помощью aqtinstall с кэшированием
-      - name: Cache Qt 6.8.0
-        id: cache-qt
-        uses: actions/cache@v3
-        with:
-          path: /opt/Qt
-          key: qt-${{ runner.os }}-6.8.0-gcc_64-${{ hashFiles('**/build.yml') }}
-          restore-keys: |
-            qt-${{ runner.os }}-6.8.0-gcc_64-
-
-      - name: Install Qt 6.8.0 with aqtinstall
-        id: install-qt
-        run: |
-          echo "=== Установка Qt 6.8.0 с помощью aqtinstall ==="
-
-          # Определить версию Qt и архитектуру для aqtinstall
-          QT_VERSION="6.8.0"
-          # ВАЖНО: Используем 'gcc_64' как имя каталога, которое создает aqtinstall,
-          # а не 'linux_gcc_64', которое возвращает команда list-qt
-          QT_ARCH_DIR="gcc_64"
-          # Имя архитектуры для команды aqt install-qt
-          QT_ARCH_INSTALL="linux_gcc_64"
-          
-          QT_MODULES="qtmultimedia qt5compat qtshadertools"
-
-          # Построить путь установки
-          QT_INSTALL_PATH="/opt/Qt/$QT_VERSION/$QT_ARCH_DIR"
-          
-          if [ -d "$QT_INSTALL_PATH" ] && [ -f "$QT_INSTALL_PATH/bin/qmake6" ]; then
-            echo "Qt $QT_VERSION ($QT_ARCH_DIR) найден в $QT_INSTALL_PATH (возможно из кэша или предыдущей установки). Пропуск установки aqtinstall."
-            echo "cache-hit-local=true" >> $GITHUB_OUTPUT
-          else
-            echo "Qt $QT_VERSION ($QT_ARCH_DIR) не найден в $QT_INSTALL_PATH. Начинаем установку с помощью aqtinstall."
-            echo "cache-hit-local=false" >> $GITHUB_OUTPUT
-
-            echo "Установка aqtinstall..."
-            python3 -m pip install aqtinstall
-
-            echo "Создание каталога /opt/Qt и назначение прав..."
-            sudo mkdir -p /opt/Qt
-            sudo chown $USER:$USER /opt/Qt
-
-            echo "Установка Qt $QT_VERSION ($QT_ARCH_INSTALL) с модулями: $QT_MODULES"
-            INSTALL_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH_INSTALL -m $QT_MODULES -O /opt/Qt"
-            echo "Команда установки: $INSTALL_CMD"
-            if $INSTALL_CMD; then
-              echo "Установка Qt $QT_VERSION с модулями '$QT_MODULES' прошла успешно."
-            else
-              echo "::warning::Установка Qt $QT_VERSION с модулями '$QT_MODULES' не удалась. Пробуем установить только базовый Qt без дополнительных модулей..."
-              FALLBACK_CMD="aqt install-qt linux desktop $QT_VERSION $QT_ARCH_INSTALL -O /opt/Qt"
-              echo "Команда установки (запасной вариант): $FALLBACK_CMD"
-              if $FALLBACK_CMD; then
-                echo "Установка базового Qt $QT_VERSION прошла успешно."
-              else
-                echo "::error::Критическая ошибка: Не удалось установить Qt $QT_VERSION ни с модулями, ни без них."
-                echo "Доступные модули для Qt $QT_VERSION $QT_ARCH_INSTALL:"
-                aqt list-qt linux desktop --modules $QT_VERSION $QT_ARCH_INSTALL || echo "Не удалось получить список модулей."
-                exit 1
-              fi
-            fi
-          fi
-
-          # Проверить установку/наличие Qt
-          echo "=== Проверка установленного/закэшированного Qt 6.8.0 ==="
-          # Используем правильный путь QT_INSTALL_PATH, который указывает на gcc_64
-          if [ -d "$QT_INSTALL_PATH/lib" ] && [ -f "$QT_INSTALL_PATH/bin/qmake6" ]; then
-            echo "Каталог $QT_INSTALL_PATH/lib найден и qmake6 доступен."
-            echo "Версия Qt (qmake6 -v):"
-            $QT_INSTALL_PATH/bin/qmake6 -v || echo "Не удалось получить версию qmake6."
-            echo "Наличие ключевых библиотек:"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Core.so* 2>/dev/null || echo "  libQt6Core.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Gui.so* 2>/dev/null || echo "  libQt6Gui.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Widgets.so* 2>/dev/null || echo "  libQt6Widgets.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Network.so* 2>/dev/null || echo "  libQt6Network.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6DBus.so* 2>/dev/null || echo "  libQt6DBus.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Qml.so* 2>/dev/null || echo "  libQt6Qml.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Quick.so* 2>/dev/null || echo "  libQt6Quick.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Multimedia.so* 2>/dev/null || echo "  libQt6Multimedia.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6OpenGL.so* 2>/dev/null || echo "  libQt6OpenGL.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Sql.so* 2>/dev/null || echo "  libQt6Sql.so* не найден"
-            ls -la $QT_INSTALL_PATH/lib/libQt6Concurrent.so* 2>/dev/null || echo "  libQt6Concurrent.so* не найден"
-            
-            echo "Наличие ключевых плагинов (пример):"
-            if ls $QT_INSTALL_PATH/plugins/platforms/libqxcb.so >/dev/null 2>&1; then
-              echo "  Плагин XCB (libqxcb.so) найден"
-            else
-              echo "  Плагин XCB (libqxcb.so) не найден"
-            fi
-            if ls $QT_INSTALL_PATH/plugins/sqldrivers/libqsqlite.so >/dev/null 2>&1; then
-              echo "  Плагин SQLite (libqsqlite.so) найден"
-            else
-              echo "  Плагин SQLite (libqsqlite.so) не найден"
-            fi
-          else
-            echo "::error::Критическая ошибка: Каталог $QT_INSTALL_PATH/lib или qmake6 НЕ НАЙДЕН."
-            echo "Содержимое /opt/Qt (если есть):"
-            ls -la /opt/Qt/ 2>/dev/null || echo "  /opt/Qt пуст или не существует"
-            echo "Содержимое /opt/Qt/$QT_VERSION/ (если есть):"
-            ls -la /opt/Qt/$QT_VERSION/ 2>/dev/null || echo "  /opt/Qt/$QT_VERSION/ пуст или не существует"
-            exit 1
-          fi
-          echo "=== Установка/проверка Qt 6.8.0 завершена ==="
-
-      - name: Save Qt 6.8.0 Cache
-        if: steps.cache-qt.outputs.cache-hit != 'true' && steps.install-qt.outputs.cache-hit-local == 'false'
-        uses: actions/cache/save@v3
-        with:
-          path: /opt/Qt
-          key: qt-${{ runner.os }}-6.8.0-gcc_64-${{ hashFiles('**/build.yml') }}
-      # -----------------------         
-      
-      # -----------------------
-      # Копировать библиотеки Qt 6.8.0 из установки aqtinstall в AppDir
-      - name: Copy Qt 6.8.0 Libraries from aqtinstall to AppDir
-        run: |
-          echo "=== Копирование библиотек Qt 6.8.0 из aqtinstall в AppDir ==="
-
-          QT_VERSION="6.8.0"
-          QT_ARCH_DIR="gcc_64"
-          QT_INSTALL_PATH="/opt/Qt/$QT_VERSION/$QT_ARCH_DIR"
-
-          # Проверить, существует ли каталог установки Qt
-          if [ ! -d "$QT_INSTALL_PATH/lib" ]; then
-            echo "::error::Каталог установки Qt $QT_INSTALL_PATH/lib не найден. Установка Qt 6.8.0 не удалась."
-            exit 1
-          fi
-
-          # Создать каталог в AppDir, если его нет
-          mkdir -p AppDir/usr/lib
-
-          # Скопировать все библиотеки .so из Qt 6.8.0 в AppDir/usr/lib
-          # Это перезапишет библиотеки, скопированные ранее copy_deps из системных пакетов (версии 6.4.2)
-          echo "Копирование библиотек Qt 6.8.0 из $QT_INSTALL_PATH/lib в AppDir/usr/lib..."
-          cp -v $QT_INSTALL_PATH/lib/libQt6*.so.* AppDir/usr/lib/ 2>&1 | grep -E '(copied|скопировано)' || echo "Копирование завершено (возможны сообщения о перезаписи или отсутствии английского вывода)."
-
-          # Проверить, что библиотеки Qt 6.8.0 теперь находятся в AppDir/usr/lib
-          echo "Проверка наличия скопированных библиотек Qt 6.8.0 в AppDir/usr/lib:"
-          ls -la AppDir/usr/lib/libQt6*.so.* 2>/dev/null || echo "Библиотеки Qt6 не найдены в AppDir/usr/lib/"
-          
-          echo "=== Копирование Qt 6.8.0 завершено ==="
-      # -----------------------
-
-
-      # -----------------------
-      # Скачиваем и распаковываем готовую сборку ICU для Ubuntu 22.04
-      - name: Download and Extract ICU (Ubuntu 22.04)
-        run: |
-          echo "=== Скачивание ICU ==="
-          wget https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-Ubuntu22.04-x64.tgz
-          wget https://github.com/unicode-org/icu/releases/download/release-76-1/icu4c-76_1-Ubuntu22.04-x64.tgz
-          echo "=== Распаковка ICU ==="
-          tar xzf icu4c-73_2-Ubuntu22.04-x64.tgz
-          tar xzf icu4c-76_1-Ubuntu22.04-x64.tgz
-          echo "=== Копирование библиотек ICU в AppDir ==="
-          mkdir -p AppDir/usr/lib
-          # Предполагаем, что библиотеки находятся в подкаталоге lib после распаковки
-          echo
-          ls -la
-          echo
-          ls -la ./icu/usr/local/lib/
-          echo
-          cp ./icu/usr/local/lib/*.* AppDir/usr/lib/
-    
-          echo "Файлы ICU в AppDir/usr/lib/ после копирования:"
-          ls -la AppDir/usr/lib/libicu* 2>/dev/null || echo "Файлы libicu* не найдены в AppDir/usr/lib/"
-    
-          # Удаляем временные файлы
-          rm -rf icu4c-73_2-Ubuntu22.04-x64*
-          rm -rf icu4c-76_1-Ubuntu22.04-x64*
-      # -----------------------
-
-      # -----------------------
-      # Кэшируем сборку TagLib из Git
-      - name: Cache TagLib Git Build
-        id: cache-taglib
-        uses: actions/cache@v3
-        with:
-          path: ~/taglib_build
-          # Используем фиксированный ключ, пока не добавим динамическое определение версии
-          key: taglib-git-tip-${{ runner.os }}
-
-      # -----------------------
-      # Сборка TagLib из Git, если кеш пустой
-      - name: Build TagLib from Git
-        if: steps.cache-taglib.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          # Устанавливаем зависимости для сборки TagLib
-          # cmake и g++ должны быть уже установлены, но перестрахуемся
-          sudo apt-get install -y build-essential cmake git
-
-          mkdir -p ~/taglib_build_source && cd ~/taglib_build_source
-          # Клонируем репозиторий TagLib
-          git clone https://github.com/taglib/taglib.git
-          cd taglib
-          git submodule update --init
-          # Можно добавить git checkout <конкретный_стабильный_тег>, если нужно
-          # Например: git checkout v2.0  (проверьте актуальный тег на GitHub)
-          
-          # Создаем директорию для сборки
-          mkdir build && cd build
-          # Конфигурируем сборку с помощью CMake
-          # Устанавливаем префикс в ~/taglib_build
-          # -DCMAKE_BUILD_TYPE=Release для оптимизированной сборки
-          # -DBUILD_SHARED_LIBS=ON чтобы собирать shared libraries (.so)
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/taglib_build -DBUILD_SHARED_LIBS=ON
+          cd ${{ env.BUILD_DIR }}
+          # Скачиваем исходный код FFmpeg
+          wget https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          cd ffmpeg-${{ env.FFMPEG_VERSION }}
+          # Конфигурируем сборку
+          # --prefix указывает, куда устанавливать
+          # --enable-shared создает разделяемые библиотеки
+          # --disable-static отключает статическую сборку
+          # --disable-doc отключает сборку документации
+          # --enable-pic необходимо для правильной работы с Qt
+          ./configure \
+            --prefix=${{ env.INSTALL_PREFIX }} \
+            --enable-shared \
+            --disable-static \
+            --disable-doc \
+            --enable-pic
           # Собираем
           make -j$(nproc)
-          # Устанавливаем в ~/taglib_build
+          # Устанавливаем в $INSTALL_PREFIX
           make install
 
-      # -----------------------
-      # Копируем библиотеки TagLib в AppDir
-      - name: Copy TagLib libs to AppDir
+      - name: Download, build and install Qt 6.8.0
         run: |
-          echo "=== Копирование библиотек TagLib из Git-сборки ==="
-          if [ -d "$HOME/taglib_build/lib" ]; then
-            echo "Найден каталог библиотек: $HOME/taglib_build/lib"
-            mkdir -p AppDir/usr/lib
-            # Копируем все .so файлы из каталога lib
-            cp -v $HOME/taglib_build/lib/*.so* AppDir/usr/lib/
-            
-            echo "Файлы TagLib в AppDir/usr/lib/ после копирования:"
-            ls -la AppDir/usr/lib/libtag* 2>/dev/null || echo "Файлы libtag* не найдены в AppDir/usr/lib/"
+          cd ${{ env.BUILD_DIR }}
+          # Скачиваем исходный код Qt
+          wget https://download.qt.io/archive/qt/${{ env.QT_VERSION | split: '.' | first }}.${{ env.QT_VERSION | split: '.' | slice: 1, 1 | join: '.' }}/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
+          tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
+          cd qt-everywhere-src-${{ env.QT_VERSION }}
+          
+          # Конфигурируем сборку Qt
+          # -prefix указывает путь установки
+          # -opensource и -confirm-license принимают лицензию
+          # -nomake examples/tests ускоряет сборку
+          # -skip пропускает ненужные модули
+          # -system-<lib> использует системные библиотеки
+          # -no-rpath не встраивает пути к библиотекам (мы будем управлять LD_LIBRARY_PATH)
+          # -shared создает разделяемые библиотеки
+          # -I и -L указывают пути к заголовкам и библиотекам FFmpeg
+          ./configure -prefix ${{ env.INSTALL_PREFIX }} \
+            -opensource -confirm-license \
+            -nomake examples -nomake tests \
+            -skip qtwebengine \
+            -system-zlib -system-libpng -system-libjpeg \
+            -no-rpath \
+            -shared \
+            -I ${{ env.INSTALL_PREFIX }}/include \
+            -L ${{ env.INSTALL_PREFIX }}/lib \
+            -- \
+            -DFEATURE_ffmpeg=ON \
+            -DFFMPEG_ROOT=${{ env.INSTALL_PREFIX }}
+          
+          # Собираем Qt (это займет очень много времени!)
+          cmake --build . --parallel
+          # Устанавливаем Qt
+          cmake --install .
+
+      - name: Checkout Fooyin release source code
+        run: |
+          # Определяем тег для checkout
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Если workflow запущен по тегу, используем этот тег
+            FOYIN_TAG=${GITHUB_REF#refs/tags/} # Убираем refs/tags/, остается v0.9.1
+            echo "Checking out Fooyin tag: $FOYIN_TAG"
           else
-            echo "::warning::Каталог $HOME/taglib_build/lib не найден. Возможно, сборка не удалась или установилась в другое место."
-            echo "Проверяем возможные альтернативные пути..."
-            find $HOME/taglib_build -name "libtag*" 2>/dev/null || echo "Файлы libtag* не найдены в $HOME/taglib_build"
-          fi
-      # -----------------------
-
-      
-
-      # -----------------------
-      # 1. Получить последний тег FFmpeg версии 7.x.x
-      - name: Get Latest FFmpeg 7.x Tag
-        id: ffmpeg-tag
-        run: |
-          # Клонируем репозиторий FFmpeg в временную директорию
-          cd /tmp
-          git clone --bare --filter=blob:none --quiet https://git.ffmpeg.org/ffmpeg.git ffmpeg_temp
-          cd ffmpeg_temp
-          
-          # Получаем все теги
-          # Фильтруем теги, начинающиеся с 'n7.' (например, n7.0, n7.1)
-          # Сортируем по версии и берем последний
-          LATEST_TAG=$(git tag -l "n7.*" | sort -V | tail -n 1)
-          
-          if [ -z "$LATEST_TAG" ]; then
-            echo "::error::Не удалось найти тег FFmpeg версии 7.x.x"
-            exit 1
-          fi
-          
-          # Получаем хэш коммита для этого тега
-          TAG_HASH=$(git rev-parse "$LATEST_TAG")
-          
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "hash=$TAG_HASH" >> $GITHUB_OUTPUT
-          echo "Найден последний тег FFmpeg 7.x.x: $LATEST_TAG ($TAG_HASH)"
-
-      # -----------------------
-      # 2. Кешируем сборку FFmpeg из Git
-      - name: Cache FFmpeg Git Build
-        id: cache-ffmpeg
-        uses: actions/cache@v3
-        with:
-          path: ~/ffmpeg_build
-          # Кэш будет промахиваться, если хэш коммита изменится
-          key: ffmpeg-git-${{ steps.ffmpeg-tag.outputs.hash }}-${{ runner.os }}
-
-      # -----------------------
-      # 3. Сборка FFmpeg из Git, если кеш пустой
-      - name: Build FFmpeg from Git
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf automake build-essential cmake git libtool \
-          pkg-config texinfo yasm nasm zlib1g-dev libx264-dev libx265-dev \
-          libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev wget
-
-          mkdir -p ~/ffmpeg_build_source && cd ~/ffmpeg_build_source
-          git clone https://git.ffmpeg.org/ffmpeg.git
-          cd ffmpeg
-          
-          # Переходим к найденному тегу
-          git checkout tags/${{ steps.ffmpeg-tag.outputs.tag }} -b build-branch
-          
-          # Конфигурация для сборки shared libraries (.so.x)
-          # Отключаем статические библиотеки и программы, которые не нужны
-          # Отключаем yasm/asm, если возникают ошибки (по аналогии с предыдущими попытками)
-          ./configure --prefix=$HOME/ffmpeg_build --disable-programs --disable-doc --enable-shared --disable-static --disable-yasm --disable-asm
-          make -j$(nproc)
-          make install
-
-      # -----------------------
-      # 4. Копируем библиотеки в AppDir и проверяем
-      - name: Copy FFmpeg libs to AppDir and verify
-        run: |
-          echo "=== Копирование библиотек FFmpeg из Git-сборки ==="
-          echo "Ищем файлы в $HOME/ffmpeg_build/lib/:"
-          ls -la $HOME/ffmpeg_build/lib/libavcodec.so* $HOME/ffmpeg_build/lib/libavformat.so* 2>/dev/null || echo "Файлы .so* не найдены в сборке"
-          
-          mkdir -p AppDir/usr/lib
-          cp $HOME/ffmpeg_build/lib/libavcodec.so* AppDir/usr/lib/
-          cp $HOME/ffmpeg_build/lib/libavformat.so* AppDir/usr/lib/
-          cp $HOME/ffmpeg_build/lib/*.so* AppDir/usr/lib/
-          # cp -r $HOME/ffmpeg_build/include AppDir/usr/ # Обычно не нужно для AppImage
-          
-          echo "Файлы в AppDir/usr/lib/ после копирования:"
-          ls -la AppDir/usr/lib/libavcodec.so* AppDir/usr/lib/libavformat.so* 2>/dev/null || echo "Файлы .so* отсутствуют в AppDir"
-
-      # -----------------------
-      # 5. Устанавливаем LD_LIBRARY_PATH в AppRun
-      - name: Set library path
-        run: |
-          echo 'export LD_LIBRARY_PATH=$APPDIR/usr/lib:$LD_LIBRARY_PATH' >> AppDir/AppRun
-
-      - name: Скопировать все зависимости библиотек
-        run: |
-          copy_deps() {
-            local binary="$1"
-            if [ ! -f "$binary" ]; then
-              echo "❌ Файл не найден: $binary"
+            # Если запуск не по тегу (например, workflow_dispatch)
+            # Можно использовать значение по умолчанию или input (если добавлен)
+            # FOYIN_TAG="v0.9.1" # Значение по умолчанию
+            # Или если добавлен input:
+            # FOYIN_TAG="v${{ github.event.inputs.version }}"
+            # Для простоты, используем последний релизный тег
+            echo "Not triggered by a tag push. Fetching latest release tag..."
+            FOYIN_TAG=$(git ls-remote --tags https://github.com/fooyin/fooyin.git | grep -v '{}\|-' | tail -n 1 | awk '{print $2}' | sed 's|refs/tags/||')
+            if [ -z "$FOYIN_TAG" ]; then
+              echo "Error: Could not determine latest Fooyin release tag."
               exit 1
             fi
-            echo "🔍 Поиск зависимостей для: $binary"
-            ldd "$binary" | awk '/=>/ { print $3 }' | while read lib; do
-              if [ -n "$lib" ] && [ -f "$lib" ]; then
-                mkdir -p "AppDir$(dirname "$lib")"
-                cp "$lib" "AppDir$lib"
-                echo "   ✅ Скопировано: $lib"
-              fi
-            done
-          }
-          copy_deps "AppDir/usr/bin/fooyin"
+            echo "Determined latest Fooyin release tag: $FOYIN_TAG"
+          fi
+          
+          # Клонируем репозиторий в указанную директорию
+          git clone https://github.com/fooyin/fooyin.git ${{ env.FOYIN_SOURCE_DIR }}
+          cd ${{ env.FOYIN_SOURCE_DIR }}
+          
+          # Переключаемся на нужный тег
+          git checkout "$FOYIN_TAG"
+          
+          # Проверяем текущий коммит
+          echo "Checked out commit: $(git rev-parse HEAD)"
+          echo "Commit message: $(git log --oneline -1)"
 
-      - name: Добавить libstdc++ в AppDir
+      - name: Build Fooyin
         run: |
-          echo "📦 Копирование libstdc++ в AppDir..."
-          LIBSTDCPP=$(g++ -print-file-name=libstdc++.so.6)
-          if [ -f "$LIBSTDCPP" ]; then
-            cp "$LIBSTDCPP" AppDir/usr/lib/
-            echo "✅ Скопирован: $LIBSTDCPP"
+          cd ${{ env.FOYIN_SOURCE_DIR }}
+          mkdir build
+          cd build
+          # Указываем CMake пути к нашим собранным Qt и FFmpeg
+          # CMAKE_PREFIX_PATH помогает найти Qt и FFmpeg
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }}
+          make -j$(nproc)
+          # Устанавливаем Fooyin в префикс
+          make install
+
+      - name: Create desktop file and icon
+        run: |
+          # Создаем десктоп-файл
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
+          cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<EOF
+[Desktop Entry]
+Name=Fooyin
+Exec=fooyin %F
+Type=Application
+Icon=fooyin
+Categories=AudioVideo;Player;
+MimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;
+EOF
+          
+          # Копируем иконку (предполагаем, что она есть в репозитории)
+          # Вам нужно будет указать правильный путь к иконке в вашем проекте
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+          # Пример: cp ${{ env.FOYIN_SOURCE_DIR }}/path/to/your/fooyin-icon.png ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+          # Если иконки нет, создайте заглушку или пропустите этот шаг
+          # touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+          # Или попробуем найти её автоматически
+          ICON_PATH=$(find ${{ env.FOYIN_SOURCE_DIR }} -name "fooyin.png" -type f | head -n 1)
+          if [ -n "$ICON_PATH" ]; then
+              cp "$ICON_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/
+              echo "Icon copied from $ICON_PATH"
           else
-            echo "❌ Не удалось найти libstdc++"
-            exit 1
+              echo "Warning: Fooyin icon not found. AppImage might not have an icon."
+              # Создаем пустой файл для избежания ошибок в appimage-builder
+              touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           fi
 
-
-      - name: Создать скрипт AppRun
+      - name: Set Version Environment Variable
         run: |
-          cat > AppDir/AppRun << 'EOF'
-          #!/bin/bash
-          HERE="$(dirname "$(readlink -f "${0}")")"
-          export LD_LIBRARY_PATH="${HERE}/usr/lib/x86_64-linux-gnu:${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu/libproxy:${HERE}/lib/x86_64-linux-gnu:${HERE}/lib:${LD_LIBRARY_PATH}"
-          export QT_PLUGIN_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/plugins"
-          export QML2_IMPORT_PATH="${HERE}/usr/lib/x86_64-linux-gnu/qt6/qml"
-          export PATH="${HERE}/usr/bin:${PATH}"
-          exec "${HERE}/usr/bin/fooyin" "$@"
-          EOF
-          chmod +x AppDir/AppRun
-
-      - name: Создать .desktop файл
-        run: |
-          cat > AppDir/fooyin.desktop << 'EOF'
-          [Desktop Entry]
-          Name=Fooyin
-          Comment=Современный проигрыватель музыки с фокусом на высококачественное воспроизведение аудио
-          Exec=fooyin
-          Icon=fooyin
-          Terminal=false
-          Type=Application
-          Categories=AudioVideo;Audio;
-          MimeType=audio/mpeg;audio/x-flac;audio/wav;audio/x-wav;audio/ogg;audio/x-ogg;audio/aac;audio/x-m4a;audio/flac;audio/mp4;
-          EOF
-
-      - name: Скопировать иконку
-        run: |
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          ICON_FILE=$(find AppDir/usr/share/icons -name "*fooyin*" -o -name "*Fooyin*" -type f | head -1)
-          if [ -n "$ICON_FILE" ]; then
-            cp "$ICON_FILE" AppDir/usr/share/icons/hicolor/256x256/apps/fooyin.png
-            cp "$ICON_FILE" AppDir/fooyin.png
-            echo "✅ Иконка скопирована: $ICON_FILE"
+          # Получаем версию из тега Git или из переменной окружения
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
           else
-            echo "⚠️ Иконка не найдена в пакете. Попытка загрузить fallback..."
-            wget -O AppDir/fooyin.png https://raw.githubusercontent.com/fooyin/fooyin/master/resources/fooyin-icon.png 2>/dev/null && echo "✅ Fallback иконка загружена" || echo "❌ Не удалось загрузить иконку"
+            # Для workflow_dispatch или других случаев, пытаемся получить версию из тега исходников
+            cd ${{ env.FOYIN_SOURCE_DIR }}
+            # Простой способ: попробовать получить тег текущего коммита
+            CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "dev")
+            if [ "$CURRENT_TAG" != "dev" ]; then
+                # Убираем 'v' в начале, если есть
+                VERSION_CLEAN=${CURRENT_TAG#v}
+                echo "VERSION=$VERSION_CLEAN" >> $GITHUB_ENV
+            else
+                # Если нет тега, используем "dev" или другое значение по умолчанию
+                echo "VERSION=dev" >> $GITHUB_ENV
+            fi
           fi
+          echo "Set VERSION to '${{ env.VERSION }}'"
 
-      - name: Собрать AppImage
+      - name: Build AppImage with appimage-builder
         run: |
-          ./appimagetool-x86_64.AppImage AppDir Fooyin-${{ env.LATEST_TAG }}-x86_64.AppImage
+          # appimage-builder использует переменные окружения
+          # Передаем версию в appimage-builder
+          export VERSION=${{ env.VERSION }}
+          # Запускаем appimage-builder
+          # Предполагаем, что recipe.yml находится в корне репозитория,
+          # из которого запускается этот workflow.
+          appimage-builder --recipe recipe.yml --skip-test
 
-      - name: Загрузить AppImage как артефакт
+      - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: Fooyin-AppImage
-          path: Fooyin-*.AppImage
-
-      - name: Получить текущую дату
-        id: get-date
-        run: |
-          echo "BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_ENV
-
-      - name: Создать GitHub Release (только при тегах)
-        #if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: Fooyin-*.AppImage
-          tag_name: ${{ env.LATEST_TAG }}
-          name: Fooyin ${{ env.LATEST_TAG }}
-          body: |
-            Fooyin AppImage собран автоматически из последнего .deb пакета.
-
-            **Версия:** ${{ env.LATEST_TAG }}
-            **Дата сборки:** ${{ env.BUILD_DATE }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: '*.AppImage*'
