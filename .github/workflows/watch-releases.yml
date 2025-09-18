@@ -35,10 +35,11 @@ jobs:
                   }
                 }
               });
-              
-              return latestRelease.tag_name;
+
+              core.setOutput('release_tag', latestRelease.tag_name);
+            } else {
+              core.setOutput('release_tag', '');
             }
-            return null;
 
       - name: Log result
-        run: echo "Triggered build for release: ${{ steps.check-release.outputs.result }}"
+        run: echo "Triggered build for release: ${{ steps.check-release.outputs.release_tag }}"
