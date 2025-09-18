@@ -2,7 +2,7 @@ name: Build Fooyin AppImage on Release
 
 on:
   push:             # будет запускаться при любом коммите в репо
-  pull_request:     # (опционально) запуск при PR — удобно для проверки
+  pull_request:     # запуск при PR — удобно для проверки
   repository_dispatch:
     types: [fooyin-release]
   workflow_dispatch:
@@ -32,9 +32,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             TAG="${{ github.event.client_payload.release.tag_name }}"
             echo "Using tag from repository_dispatch: $TAG"
-          else
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             TAG="${{ github.event.inputs.fooyin-tag }}"
             echo "Using tag from workflow_dispatch: $TAG"
+          else
+            TAG="main"
+            echo "Fallback to branch: $TAG"
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -71,8 +74,7 @@ jobs:
 
       - name: Install appimage-builder
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: |
-          pip install appimage-builder
+        run: pip install appimage-builder
 
       - name: Install system dependencies
         if: steps.build-cache.outputs.cache-hit != 'true'
@@ -107,9 +109,9 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          wget -q https://download.qt.io/archive/qt/6.8/$QT_VERSION/single/qt-everywhere-src-$QT_VERSION.tar.xz
-          tar xf qt-everywhere-src-$QT_VERSION.tar.xz
-          cd qt-everywhere-src-$QT_VERSION
+          wget -q https://download.qt.io/archive/qt/6.8/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
+          tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
+          cd qt-everywhere-src-${{ env.QT_VERSION }}
           ./configure -prefix $INSTALL_PREFIX -opensource -confirm-license -nomake examples -nomake tests -skip qtwebengine -system-zlib -system-libpng -system-libjpeg -no-rpath -shared -I $INSTALL_PREFIX/include -L $INSTALL_PREFIX/lib -- -DFEATURE_ffmpeg=ON -DFFMPEG_ROOT=$INSTALL_PREFIX -GNinja
           ninja
           ninja install
@@ -153,8 +155,7 @@ EOF
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build AppImage
-        run: |
-          VERSION=${{ env.VERSION }} appimage-builder --recipe recipe.yml --skip-test
+        run: VERSION=${{ env.VERSION }} appimage-builder --recipe recipe.yml --skip-test
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
