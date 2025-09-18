@@ -1,6 +1,8 @@
 name: Build Fooyin AppImage on Release
 
 on:
+  push:             # будет запускаться при любом коммите в репо
+  pull_request:     # (опционально) запуск при PR — удобно для проверки
   repository_dispatch:
     types: [fooyin-release]
   workflow_dispatch:
