@@ -152,8 +152,7 @@ EOF
 
       - name: Build AppImage
         run: |
-          export VERSION=${{ env.VERSION }}
-          appimage-builder --recipe recipe.yml --skip-test
+          VERSION=${{ env.VERSION }} appimage-builder --recipe recipe.yml --skip-test
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
