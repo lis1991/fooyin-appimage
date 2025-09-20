@@ -72,9 +72,13 @@ jobs:
         with:
           python-version: '3.10'
 
+      #- name: Install appimage-builder
+        #if: steps.build-cache.outputs.cache-hit != 'true'
+        #run: pip install appimage-builder
       - name: Install appimage-builder
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: pip install appimage-builder
+        run: |
+          pip install appimage-builder==0.8.2
 
       - name: Install system dependencies
         if: steps.build-cache.outputs.cache-hit != 'true'
