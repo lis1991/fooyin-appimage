@@ -93,7 +93,6 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           cd ffmpeg-${{ env.FFMPEG_VERSION }}
@@ -110,7 +109,6 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://download.qt.io/archive/qt/6.8/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           cd qt-everywhere-src-${{ env.QT_VERSION }}
@@ -159,7 +157,6 @@ EOF
             cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           else
             echo "WARNING: Icon not found at $ICON_SRC_PATH. AppImage will lack an icon."
-            # Создаем пустой файл, чтобы избежать ошибок appimage-builder
             mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
             touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           fi
@@ -168,7 +165,6 @@ EOF
         id: clean-version
         run: |
           CLEAN_VERSION=${{ env.TAG }}
-          # Убираем ведущую 'v', если есть
           CLEAN_VERSION=${CLEAN_VERSION#v}
           echo "VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
