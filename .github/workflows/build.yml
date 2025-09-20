@@ -93,6 +93,7 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
+          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           cd ffmpeg-${{ env.FFMPEG_VERSION }}
@@ -109,6 +110,7 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
+          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://download.qt.io/archive/qt/6.8/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           cd qt-everywhere-src-${{ env.QT_VERSION }}
@@ -196,5 +198,5 @@ EOF
             - FFmpeg ${{ env.FFMPEG_VERSION }}
 
             Built from: https://github.com/fooyin/fooyin/releases/tag/${{ env.TAG }}
-          files: Fooyin-*.AppImage*   # <--- Исправлено: добавлена звездочка
+          files: Fooyin-*.AppImage*
           prerelease: false
