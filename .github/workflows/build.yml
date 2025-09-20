@@ -2,7 +2,6 @@ name: Build Fooyin AppImage on Release
 
 on:
   push:             # будет запускаться при любом коммите в репо
-    branches: [ main ]
   pull_request:     # запуск при PR — удобно для проверки
   repository_dispatch:
     types: [fooyin-release]
@@ -94,6 +93,7 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
+          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
           cd ffmpeg-${{ env.FFMPEG_VERSION }}
@@ -110,10 +110,23 @@ jobs:
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
+          # Исправлено: Убраны лишние пробелы в URL
           wget -q https://download.qt.io/archive/qt/6.8/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
           cd qt-everywhere-src-${{ env.QT_VERSION }}
-          ./configure -prefix $INSTALL_PREFIX -opensource -confirm-license -nomake examples -nomake tests -skip qtwebengine -system-zlib -system-libpng -system-libjpeg -no-rpath -shared -I $INSTALL_PREFIX/include -L $INSTALL_PREFIX/lib -- -DFEATURE_ffmpeg=ON -DFFMPEG_ROOT=$INSTALL_PREFIX -GNinja
+          ./configure -prefix ${{ env.INSTALL_PREFIX }} \
+            -opensource -confirm-license \
+            -nomake examples -nomake tests \
+            -skip qtwebengine \
+            -system-zlib -system-libpng -system-libjpeg \
+            -no-rpath \
+            -shared \
+            -I ${{ env.INSTALL_PREFIX }}/include \
+            -L ${{ env.INSTALL_PREFIX }}/lib \
+            -- \
+            -DFEATURE_ffmpeg=ON \
+            -DFFMPEG_ROOT=${{ env.INSTALL_PREFIX }} \
+            -GNinja
           ninja
           ninja install
 
@@ -130,7 +143,7 @@ jobs:
       - name: Prepare AppDir (Desktop file and icon)
         run: |
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
-          cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<EOF
+          cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<'EOF'
 [Desktop Entry]
 Name=Fooyin
 Exec=fooyin %F
@@ -146,26 +159,34 @@ EOF
             cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           else
             echo "WARNING: Icon not found at $ICON_SRC_PATH. AppImage will lack an icon."
+            # Создаем пустой файл, чтобы избежать ошибок appimage-builder
+            mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+            touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           fi
 
       - name: Clean version from tag
         id: clean-version
         run: |
-          CLEAN_VERSION=${TAG#v}
+          CLEAN_VERSION=${{ env.TAG }}
+          # Убираем ведущую 'v', если есть
+          CLEAN_VERSION=${CLEAN_VERSION#v}
           echo "VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build AppImage
-        run: VERSION=${{ env.VERSION }} appimage-builder --recipe recipe.yml --skip-test
+        run: |
+          export VERSION=${{ env.VERSION }}
+          appimage-builder --recipe recipe.yml --skip-test
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Fooyin-AppImage-${{ env.VERSION }}
-          path: Fooyin-*.AppImage
+          path: Fooyin-*.AppImage*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
+        if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
         with:
           tag_name: ${{ env.TAG }}-appimage
           name: "Fooyin ${{ env.TAG }} (AppImage)"
@@ -177,5 +198,5 @@ EOF
             - FFmpeg ${{ env.FFMPEG_VERSION }}
 
             Built from: https://github.com/fooyin/fooyin/releases/tag/${{ env.TAG }}
-          files: Fooyin-*.AppImage
+          files: Fooyin-*.AppImage*
           prerelease: false
