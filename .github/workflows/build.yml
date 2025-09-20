@@ -36,7 +36,7 @@ jobs:
             TAG="${{ github.event.inputs.fooyin-tag }}"
             echo "Using tag from workflow_dispatch: $TAG"
           else
-            TAG="main"
+            TAG="master"
             echo "Fallback to branch: $TAG"
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
