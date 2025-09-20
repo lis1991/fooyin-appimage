@@ -2,6 +2,7 @@ name: Build Fooyin AppImage on Release
 
 on:
   push:             # будет запускаться при любом коммите в репо
+    branches: [ main ]
   pull_request:     # запуск при PR — удобно для проверки
   repository_dispatch:
     types: [fooyin-release]
