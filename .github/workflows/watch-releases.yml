@@ -1,46 +1,56 @@
-name: Watch Fooyin Releases
+# .github/workflows/03-watch-fooyin-releases.yml
+name: 03. Watch Fooyin Releases
 
 on:
   schedule:
-    - cron: '0 4 * * 0' # Каждое воскресенье в 4:00 утра
+    # Проверять каждые 6 часов
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
-  check-releases:
+  check-and-trigger:
     runs-on: ubuntu-latest
     steps:
-      - name: Check latest Fooyin release
-        id: check-release
+      - name: Get latest Fooyin release
+        id: get-latest-release
         uses: actions/github-script@v7
         with:
           script: |
-            const core = require('@actions/core'); // <-- Добавлена эта строка
             const { data: releases } = await github.rest.repos.listReleases({
               owner: 'fooyin',
               repo: 'fooyin'
             });
-            
+
             if (releases.length > 0) {
               const latestRelease = releases[0];
-              console.log('Latest Fooyin release:', latestRelease.tag_name);
-              
-              // Триггерим сборку AppImage
-              await github.rest.repos.createDispatchEvent({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                event_type: 'fooyin-release',
-                client_payload: {
-                  release: {
-                    tag_name: latestRelease.tag_name,
-                    html_url: latestRelease.html_url
-                  }
-                }
-              });
-
-              core.setOutput('release_tag', latestRelease.tag_name);
+              core.setOutput('tag_name', latestRelease.tag_name);
+              core.setOutput('html_url', latestRelease.html_url);
+              core.info(`Latest Fooyin release: ${latestRelease.tag_name}`);
             } else {
-              core.setOutput('release_tag', '');
+              core.setFailed('No releases found for fooyin/fooyin');
             }
 
-      - name: Log result
-        run: echo "Triggered build for release: ${{ steps.check-release.outputs.release_tag }}"
+      - name: Check if release AppImage already exists (simplified check)
+        id: check-artifact
+        run: |
+          # Это упрощенная проверка. В реальности можно проверить
+          # существование релиза в *этом* репозитории с определенным тегом.
+          # Пока просто выводим информацию.
+          echo "Would check for existing AppImage for tag: ${{ steps.get-latest-release.outputs.tag_name }}"
+          echo "check_result=not_implemented" >> $GITHUB_OUTPUT
+
+      - name: Trigger AppImage build
+        if: steps.check-artifact.outputs.check_result != 'found'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '02-build-fooyin-appimage.yml',
+              ref: 'main', // Или ветка, где находится workflow
+              inputs: {
+                fooyin_ref: '${{ steps.get-latest-release.outputs.tag_name }}'
+              }
+            });
+            core.info(`Triggered build for Fooyin ${{ steps.get-latest-release.outputs.tag_name }}`);
