@@ -194,7 +194,9 @@ jobs:
           # Устанавливаем зависимости, необходимые для работы Fooyin, CMake и Qt Gui/Widgets
           sudo apt-get install -y \
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
-            build-essential cmake git pkg-config 
+            build-essential cmake git pkg-config \
+            libxkbcommon-dev \
+            vulkan-headers
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
