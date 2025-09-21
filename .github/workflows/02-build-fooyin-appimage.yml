@@ -1,0 +1,137 @@
+# .github/workflows/02-build-fooyin-appimage.yml
+name: 02. Build Fooyin AppImage
+
+on:
+  workflow_dispatch:
+    inputs:
+      fooyin_ref:
+        description: 'Fooyin Git ref (tag/branch/commit, e.g., v0.9.1 or master)'
+        required: true
+        default: 'master'
+  push:
+    branches:
+      - main # Или ваша основная ветка
+  pull_request:
+    branches:
+      - main
+
+env:
+  QT_VERSION: "6.8.0" # Должен совпадать с 01-prepare-and-cache-env.yml
+  FFMPEG_VERSION: "7.1.2" # Должен совпадать с 01-prepare-and-cache-env.yml
+  INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
+  FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
+  CACHE_KEY: "build-env-qt${{ env.QT_VERSION }}-ffmpeg${{ env.FFMPEG_VERSION }}-v1" # Должен совпадать
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout this repo (for recipe.yml)
+        uses: actions/checkout@v4
+
+      - name: Determine Fooyin ref
+        id: determine-ref
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REF="${{ github.event.inputs.fooyin_ref }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            REF="${{ github.event.pull_request.head.sha }}"
+          else # push
+            REF="${{ github.sha }}"
+          fi
+          echo "REF=$REF" >> $GITHUB_ENV
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+
+      - name: Checkout Fooyin source
+        uses: actions/checkout@v4
+        with:
+          repository: fooyin/fooyin
+          ref: ${{ env.REF }}
+          path: ${{ env.FOYIN_SOURCE_DIR }}
+
+      - name: Setup AppDir structure
+        run: mkdir -p ${{ env.INSTALL_PREFIX }}
+
+      # --- ВОССТАНОВЛЕНИЕ КЭША СРЕДЫ ---
+      - name: Restore cached build environment
+        uses: actions/cache/restore@v4
+        id: restore-env
+        with:
+          path: ${{ env.INSTALL_PREFIX }}
+          key: ${{ env.CACHE_KEY }}
+          fail-on-cache-miss: true # Критично: если кэш не найден, останавливаемся
+
+      - name: Verify restored environment
+        run: |
+          if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
+            echo "Qt qmake found."
+            ${{ env.INSTALL_PREFIX }}/bin/qmake -v
+          else
+            echo "Warning: qmake not found in cache."
+          fi
+          if [ -f "${{ env.INSTALL_PREFIX }}/lib/libavcodec.so" ]; then
+            echo "FFmpeg libraries found."
+          else
+            echo "Warning: FFmpeg libraries not found in cache."
+          fi
+
+      - name: Set up Python and appimage-builder
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install appimage-builder
+
+      # --- СБОРКА FOYIN ---
+      - name: Build Fooyin
+        run: |
+          cd ${{ env.FOYIN_SOURCE_DIR }}
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --parallel
+          cmake --build . --parallel --target install
+
+      - name: Prepare AppDir (Desktop file and icon)
+        run: |
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
+          cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<'EOF'
+[Desktop Entry]
+Name=Fooyin
+Exec=fooyin %F
+Type=Application
+Icon=fooyin
+Categories=AudioVideo;Player;
+Comment=A customisable music player
+MimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;
+EOF
+          ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+          if [ -f "$ICON_SRC_PATH" ]; then
+            cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+          else
+            echo "WARNING: Icon not found, creating placeholder."
+            touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+          fi
+
+      - name: Determine Version
+        id: get-version
+        run: |
+          cd ${{ env.FOYIN_SOURCE_DIR }}
+          # Пытаемся получить тег или используем короткий SHA
+          VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "${{ env.REF }}" | cut -c1-8)
+          VERSION=${VERSION#v} # Убираем 'v' в начале, если есть
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build AppImage
+        run: |
+          export VERSION=${{ env.VERSION }}
+          appimage-builder --recipe recipe.yml --skip-test
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fooyin-AppImage-${{ env.VERSION }}
+          path: Fooyin-*.AppImage*
