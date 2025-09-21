@@ -8,6 +8,12 @@ on:
         description: 'Fooyin Git ref (tag/branch/commit, e.g., v0.9.1 or master)'
         required: true
         default: 'master'
+  workflow_call:
+    inputs:
+      fooyin_ref:
+        description: 'Fooyin Git ref (tag/branch/commit, e.g., v0.9.1 or master)'
+        type: string
+        required: true
   push:
     branches:
       - main # Или ваша основная ветка
@@ -15,12 +21,16 @@ on:
     branches:
       - main
 
+# Определяем версии как переменные верхнего уровня для использования в env
 env:
-  QT_VERSION: "6.8.0" # Должен совпадать с 01-prepare-and-cache-env.yml
-  FFMPEG_VERSION: "7.1.2" # Должен совпадать с 01-prepare-and-cache-env.yml
+  # Версии (должны совпадать с 01-prepare-and-cache-env.yml)
+  QT_VERSION: "6.8.0"
+  FFMPEG_VERSION: "7.1.2"
+  # Директории
   INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
-  CACHE_KEY: "build-env-qt${{ env.QT_VERSION }}-ffmpeg${{ env.FFMPEG_VERSION }}-v1" # Должен совпадать
+  # Ключ кэша (должен совпадать с 01-prepare-and-cache-env.yml)
+  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3"
 
 jobs:
   build:
@@ -33,6 +43,8 @@ jobs:
         id: determine-ref
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REF="${{ github.event.inputs.fooyin_ref }}"
+          elif [[ "${{ github.event_name }}" == "workflow_call" ]]; then
             REF="${{ github.event.inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             REF="${{ github.event.pull_request.head.sha }}"
@@ -81,7 +93,7 @@ jobs:
           python-version: '3.10'
       - run: pip install appimage-builder
 
-      # --- СБОРКА FOYIN ---
+      # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
@@ -115,7 +127,6 @@ jobs:
             echo "WARNING: Icon not found at $ICON_SRC_PATH. Creating a placeholder."
             touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           fi
-      
 
       - name: Determine Version
         id: get-version
@@ -130,6 +141,8 @@ jobs:
       - name: Build AppImage
         run: |
           export VERSION=${{ env.VERSION }}
+          # Предполагается, что recipe.yml находится в корне репозитория,
+          # из которого запускается этот workflow.
           appimage-builder --recipe recipe.yml --skip-test
 
       - name: Upload AppImage Artifact
@@ -137,3 +150,26 @@ jobs:
         with:
           name: Fooyin-AppImage-${{ env.VERSION }}
           path: Fooyin-*.AppImage*
+
+      # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB ---
+      - name: Create GitHub Release
+        # Создаем релиз только при запуске вручную или через workflow_call (например, из 03-watch-fooyin-releases.yml)
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          # Используем оригинальный тег из Fooyin, если это был тег, иначе используем нашу версию
+          tag_name: ${{ startsWith(github.event.inputs.fooyin_ref, 'v') && github.event.inputs.fooyin_ref || format('{0}-appimage', env.VERSION) }}
+          name: "Fooyin ${{ env.VERSION }} (AppImage)"
+          body: |
+            Automatic AppImage build for Fooyin ${{ env.VERSION }}
+
+            **Includes:**
+            - Qt ${{ env.QT_VERSION }} (Prebuilt)
+            - FFmpeg ${{ env.FFMPEG_VERSION }}
+
+            Built from: https://github.com/fooyin/fooyin/commit/${{ env.REF }}
+          files: |
+            Fooyin-*.AppImage
+            Fooyin-*.AppImage.zsync
+          prerelease: ${{ !startsWith(github.event.inputs.fooyin_ref, 'v') || contains(github.event.inputs.fooyin_ref, '-') }}
+          # fail_on_unmatched_files: true # Опционально, для строгой проверки
