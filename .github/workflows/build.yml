@@ -130,13 +130,15 @@ jobs:
             -shared \
             -I ${{ env.INSTALL_PREFIX }}/include \
             -L ${{ env.INSTALL_PREFIX }}/lib \
-            -D LLVM_ROOT=/usr/lib/llvm-15 \        # <-- Добавлено
-            -D CLANG_ROOT=/usr/lib/llvm-15 \       # <-- Добавлено
+            #-D LLVM_ROOT=/usr/lib/llvm-15 \        # <-- Добавлено
+            #-D CLANG_ROOT=/usr/lib/llvm-15 \       # <-- Добавлено
+            -no-feature-clangcppchecks \  # <-- Отключает проверки Clang C++
+            -no-feature-zstd \            # <-- Иногда помогает избежать проблем с зависимостями
             -- \
             -DFEATURE_ffmpeg=ON \
             -DFFMPEG_ROOT=${{ env.INSTALL_PREFIX }} \
-            -DCMAKE_C_COMPILER=clang-15 \          # <-- Добавлено
-            -DCMAKE_CXX_COMPILER=clang++-15 \      # <-- Добавлено
+            #-DCMAKE_C_COMPILER=clang-15 \          # <-- Добавлено
+            #-DCMAKE_CXX_COMPILER=clang++-15 \      # <-- Добавлено
             -GNinja
           ninja
           ninja install
