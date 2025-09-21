@@ -1,0 +1,154 @@
+# .github/workflows/01-prepare-and-cache-env.yml
+name: 01. Prepare & Cache Build Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if cache exists'
+        type: boolean
+        default: false
+
+
+env:
+  QT_VERSION: "6.8.0"
+  FFMPEG_VERSION: "7.1.2"
+  BUILD_DIR: ${{ github.workspace }}/build_env
+  INSTALL_PREFIX: ${{ github.workspace }}/cached_install
+  QT_BASE_URL: "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_680/qt6_680/qt.qt6.680.linux_gcc_64"
+  # --- Обновленный список архивов ---
+  QT_ARCHIVES: >
+    6.8.0-0-202410030750icu-linux-Rhel8.6-x86_64.7z
+    6.8.0-0-202410030750qtbase-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+  # -------------------------------
+  CACHE_KEY: "build-env-qt${{ env.QT_VERSION }}-ffmpeg${{ env.FFMPEG_VERSION }}-v2" # Увеличил версию кэша
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for existing cache
+        id: cache-check
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.INSTALL_PREFIX }}
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Setup directories
+        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        run: |
+          mkdir -p ${{ env.BUILD_DIR }}
+          mkdir -p ${{ env.INSTALL_PREFIX }}
+
+      - name: Install tools
+        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full wget build-essential yasm nasm curl
+
+      # --- СКАЧИВАНИЕ И УСТАНОВКА ПРЕДКОМПИЛИРОВАННОГО QT ---
+      - name: Download and Install Prebuilt Qt
+        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          echo "Starting Qt download and installation..."
+          
+          # Итерируем по списку архивов
+          for archive in ${{ env.QT_ARCHIVES }}; do
+            echo "Downloading $archive..."
+            wget -q "${{ env.QT_BASE_URL }}/$archive"
+            
+            # Опционально: Проверка контрольной суммы (используя .sha1 файл)
+            # echo "Downloading SHA1 for $archive..."
+            # wget -q "${{ env.QT_BASE_URL }}/$archive.sha1"
+            # echo "Verifying $archive..."
+            # sha1sum -c "$archive.sha1" || { echo "SHA1 verification failed for $archive"; exit 1; }
+            
+            echo "Extracting $archive..."
+            7z x "$archive"
+            
+            # Очистка архива после распаковки для экономии места
+            rm -f "$archive" # "$archive.sha1"
+          done
+          
+          # После распаковки все файлы обычно находятся в подкаталоге, например, 6.8.0/gcc_64/
+          # Находим этот каталог и копируем его содержимое в INSTALL_PREFIX
+          QT_SOURCE_DIR=$(find . -maxdepth 2 -type d -name "gcc_64" | head -n 1)
+          
+          if [ -z "$QT_SOURCE_DIR" ] || [ ! -d "$QT_SOURCE_DIR" ]; then
+              echo "Error: Could not find 'gcc_64' directory after extraction."
+              echo "Contents of build directory:"
+              ls -la
+              find . -type d -name "*" | head -n 20
+              exit 1
+          fi
+          
+          echo "Found Qt source directory: $QT_SOURCE_DIR"
+          echo "Copying Qt files to ${{ env.INSTALL_PREFIX }}..."
+          mkdir -p ${{ env.INSTALL_PREFIX }}
+          cp -r "$QT_SOURCE_DIR"/* ${{ env.INSTALL_PREFIX }}/
+          
+          # Делаем qmake исполняемым, если он существует
+          if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
+              chmod +x ${{ env.INSTALL_PREFIX }}/bin/qmake
+              echo "Made qmake executable."
+          else
+              echo "Warning: qmake not found in ${{ env.INSTALL_PREFIX }}/bin/ after copying."
+          fi
+          
+          # Проверяем установку
+          echo "Qt installation check:"
+          if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
+              ${{ env.INSTALL_PREFIX }}/bin/qmake -v
+          else
+              echo "Warning: qmake binary not present after installation steps."
+          fi
+          
+          echo "Qt installation process finished."
+
+      # --- СБОРКА FFMPEG ---
+      - name: Build and install FFmpeg
+        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          echo "Starting FFmpeg build..."
+          if [ ! -d "ffmpeg-${{ env.FFMPEG_VERSION }}" ]; then
+              echo "Downloading FFmpeg ${{ env.FFMPEG_VERSION }}..."
+              wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+              echo "Extracting FFmpeg..."
+              tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          else
+              echo "FFmpeg source directory already exists, skipping download."
+          fi
+          cd ffmpeg-${{ env.FFMPEG_VERSION }}
+          echo "Configuring FFmpeg..."
+          ./configure \
+            --prefix=${{ env.INSTALL_PREFIX }} \
+            --enable-shared \
+            --disable-static \
+            --disable-doc \
+            --enable-pic
+          echo "Building FFmpeg..."
+          make -j$(nproc)
+          echo "Installing FFmpeg..."
+          make install
+          echo "FFmpeg build and install completed."
+
+      # --- СОХРАНЕНИЕ КЭША ---
+      - name: Save build environment to cache
+        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.INSTALL_PREFIX }}
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Report Cache Status
+        run: |
+          if [[ "${{ steps.cache-check.outputs.cache-hit }}" == "true" && "${{ inputs.force_rebuild }}" != "true" ]]; then
+            echo "✅ Using existing cached environment."
+          elif [[ "${{ inputs.force_rebuild }}" == "true" ]]; then
+            echo "🔄 Forced rebuild completed and cache updated."
+          else
+            echo "🆕 New environment built and cached."
+          fi
+          echo "Cache key used: ${{ env.CACHE_KEY }}"
