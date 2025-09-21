@@ -100,6 +100,84 @@ jobs:
             echo "Warning: FFmpeg libraries not found in cache."
           fi
 
+      - name: Debug Qt Cache Structure and Files
+        run: |
+          echo "=====[ DEBUG: Qt Cache Structure ]====="
+          
+          echo "--- Qt Installation Prefix ---"
+          echo "INSTALL_PREFIX: ${{ env.INSTALL_PREFIX }}"
+          
+          echo "--- Checking if INSTALL_PREFIX exists ---"
+          if [ -d "${{ env.INSTALL_PREFIX }}" ]; then
+            echo "Directory exists."
+          else
+            echo "ERROR: INSTALL_PREFIX directory does NOT exist!"
+          fi
+          
+          echo "--- Listing contents of INSTALL_PREFIX (top level) ---"
+          ls -la "${{ env.INSTALL_PREFIX }}" | head -n 20
+          
+          echo "--- Checking bin directory ---"
+          if [ -d "${{ env.INSTALL_PREFIX }}/bin" ]; then
+            echo "bin/ exists. Contents (first 10):"
+            ls -la "${{ env.INSTALL_PREFIX }}/bin" | head -n 10
+            echo "qmake exists?"
+            ls -la "${{ env.INSTALL_PREFIX }}/bin/qmake" 2>/dev/null || echo "qmake NOT in bin/"
+          else
+            echo "bin/ directory does NOT exist!"
+          fi
+          
+          echo "--- Checking lib directory ---"
+          if [ -d "${{ env.INSTALL_PREFIX }}/lib" ]; then
+            echo "lib/ exists. Size: $(du -sh ${{ env.INSTALL_PREFIX }}/lib | cut -f1)"
+            echo "Number of .so files: $(find ${{ env.INSTALL_PREFIX }}/lib -name '*.so*' 2>/dev/null | wc -l)"
+            echo "Looking for Widgets library..."
+            find ${{ env.INSTALL_PREFIX }}/lib -name "*Widget*" -type f 2>/dev/null || echo "No Widget .so files found directly in lib/"
+          else
+            echo "lib/ directory does NOT exist!"
+          fi
+          
+          echo "--- Checking lib/cmake directory ---"
+          if [ -d "${{ env.INSTALL_PREFIX }}/lib/cmake" ]; then
+            echo "lib/cmake/ exists. Contents:"
+            ls -la "${{ env.INSTALL_PREFIX }}/lib/cmake/" | head -n 15
+          else
+            echo "lib/cmake/ directory does NOT exist!"
+          fi
+          
+          echo "--- Detailed Qt6Widgets Check ---"
+          WIDGETS_CMAKE_DIR="${{ env.INSTALL_PREFIX }}/lib/cmake/Qt6Widgets"
+          if [ -d "$WIDGETS_CMAKE_DIR" ]; then
+            echo "Qt6Widgets cmake directory EXISTS: $WIDGETS_CMAKE_DIR"
+            echo "Contents of Qt6Widgets cmake dir:"
+            ls -la "$WIDGETS_CMAKE_DIR"
+            
+            echo "Checking for specific files:"
+            declare -a files_to_check=("Qt6WidgetsConfig.cmake" "Qt6WidgetsDependencies.cmake")
+            for file in "${files_to_check[@]}"; do
+              if [ -f "$WIDGETS_CMAKE_DIR/$file" ]; then
+                echo "  [FOUND] $file"
+                # Show first few lines of the config file to see what it tries to include
+                if [[ "$file" == *"Config.cmake" ]]; then
+                  echo "    First 5 lines:"
+                  head -n 5 "$WIDGETS_CMAKE_DIR/$file" | sed 's/^/      /'
+                fi
+              else
+                echo "  [MISSING] $file"
+              fi
+            done
+          else
+            echo "Qt6Widgets cmake directory DOES NOT EXIST: $WIDGETS_CMAKE_DIR"
+            echo "Searching for any Qt6Widgets* dirs in cmake..."
+            find ${{ env.INSTALL_PREFIX }}/lib/cmake/ -name "Qt6Widgets*" -type d 2>/dev/null || echo "No Qt6Widgets directories found in cmake/"
+          fi
+          
+          echo "--- Full Search for Qt6WidgetsDependencies.cmake ---"
+          echo "Searching entire cache prefix for Qt6WidgetsDependencies.cmake:"
+          find ${{ env.INSTALL_PREFIX }} -name "Qt6WidgetsDependencies.cmake" 2>/dev/null || echo "Qt6WidgetsDependencies.cmake NOT FOUND anywhere in cache"
+          
+          echo "=====[ END DEBUG ]====="
+
       - name: Set up Python and appimage-builder
         uses: actions/setup-python@v5
         with:
