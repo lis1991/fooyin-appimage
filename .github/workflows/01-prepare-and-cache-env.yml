@@ -27,6 +27,11 @@ env:
     6.8.0-0-202410030750icu-linux-Rhel8.6-x86_64.7z
     6.8.0-0-202410030750qtbase-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
     6.8.0-0-202410030750qtsvg-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qtwayland-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qttranslations-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qttools-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qtdeclarative-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750meta.7z
   # Ключ кэша (обновите версию при изменении конфигурации)
   CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3" 
 
