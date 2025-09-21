@@ -47,20 +47,20 @@ jobs:
           key: ${{ env.CACHE_KEY }}
 
       - name: Setup directories
-        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         run: |
           mkdir -p ${{ env.BUILD_DIR }}
           mkdir -p ${{ env.INSTALL_PREFIX }}
 
       - name: Install tools
-        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         run: |
           sudo apt-get update
           sudo apt-get install -y p7zip-full wget build-essential yasm nasm curl libutfcpp-dev
 
       # --- СКАЧИВАНИЕ И УСТАНОВКА ПРЕДКОМПИЛИРОВАННОГО QT ---
       - name: Download and Install Prebuilt Qt
-        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting Qt download and installation..."
@@ -131,7 +131,7 @@ jobs:
 
       # --- СБОРКА FFMPEG ---
       - name: Build and install FFmpeg
-        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting FFmpeg build..."
@@ -299,13 +299,13 @@ jobs:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
 
-      - name: Report Cache Status
-        run: |
-          if [[ "${{ steps.cache-check.outputs.cache-hit }}" == "true" && "${{ inputs.force_rebuild }}" != "true" ]]; then
-            echo "✅ Using existing cached environment."
-          elif [[ "${{ inputs.force_rebuild }}" == "true" ]]; then
-            echo "🔄 Forced rebuild completed and cache updated."
-          else
-            echo "🆕 New environment built and cached."
-          fi
-          echo "Cache key used: ${{ env.CACHE_KEY }}"
+      #- name: Report Cache Status
+        #run: |
+          #if [[ "${{ steps.cache-check.outputs.cache-hit }}" == "true" && "${{ inputs.force_rebuild }}" != "true" ]]; then
+            #echo "✅ Using existing cached environment."
+          #elif [[ "${{ inputs.force_rebuild }}" == "true" ]]; then
+            #echo "🔄 Forced rebuild completed and cache updated."
+          #else
+            #echo "🆕 New environment built and cached."
+          #fi
+          #echo "Cache key used: ${{ env.CACHE_KEY }}"
