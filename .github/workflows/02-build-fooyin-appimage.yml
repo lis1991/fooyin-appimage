@@ -193,9 +193,9 @@ jobs:
           sudo apt-get update
           # Устанавливаем зависимости, необходимые для работы Fooyin, CMake и Qt Gui/Widgets
           sudo apt-get install -y \
-            # Зависимости OpenGL, необходимые для Qt Gui/Widgets
+            
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
-            # Другие потенциально необходимые зависимости (на случай, если их нет в базовой среде или кэше)
+            
             build-essential cmake git pkg-config 
 
       # --- СБОРКА FOOYIN ---
