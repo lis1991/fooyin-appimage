@@ -39,13 +39,64 @@ jobs:
   prepare:
     runs-on: ubuntu-22.04
     steps:
-      #- name: Check for existing cache
-        #id: cache-check
-        #uses: actions/cache/restore@v4
-        #with:
-          #path: ${{ env.INSTALL_PREFIX }}
-          #key: ${{ env.CACHE_KEY }}
+      - name: Check for existing cache
+        id: cache-check
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.INSTALL_PREFIX }}
+          key: ${{ env.CACHE_KEY }}
 
+      # --- УДАЛЕНИЕ СУЩЕСТВУЮЩЕГО КЭША (альтернатива actions/cache/restore) ---
+      - name: Delete Existing Cache (if found)
+        # Используем github-script для работы с API
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const cacheKey = process.env.CACHE_KEY;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            console.log(`Searching for cache with key: ${cacheKey}`);
+
+            try {
+              // Список кэшей возвращается постранично. Для простоты проверим первую страницу.
+              // Для очень активных репозиториев может потребоваться итерация.
+              const response = await github.rest.actions.getActionsCacheList({
+                owner,
+                repo,
+                per_page: 100 // Максимальное значение на странице
+              });
+
+              const caches = response.data.actions_caches;
+              console.log(`Found ${caches.length} cache entries.`);
+
+              // Найти кэш с совпадающим ключом
+              const targetCache = caches.find(cache => cache.key === cacheKey);
+
+              if (targetCache) {
+                const cacheId = targetCache.id;
+                console.log(`Found cache to delete. ID: ${cacheId}, Key: ${targetCache.key}`);
+                
+                // Попытка удаления
+                await github.rest.actions.deleteActionsCacheById({
+                  owner,
+                  repo,
+                  cache_id: cacheId
+                });
+                console.log(`Successfully deleted cache ID ${cacheId}.`);
+                
+                // Опционально: небольшая задержка, чтобы убедиться, что кэш удален серверно
+                // await new Promise(resolve => setTimeout(resolve, 5000)); 
+                
+              } else {
+                console.log(`Cache with key '${cacheKey}' not found.`);
+              }
+            } catch (error) {
+              console.error(`Failed to search or delete cache: ${error.message}`);
+              // В зависимости от требований, можно завершить workflow или продолжить
+              // core.setFailed(`Cache deletion failed: ${error.message}`);
+            }
+      
       - name: Setup directories
         #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         run: |
