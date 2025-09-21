@@ -7,6 +7,11 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
+# --- Добавить это ---
+permissions:
+  actions: write # Для запуска других workflow
+  contents: read  # По-прежнему нужно для listReleases
+
 jobs:
   check-and-trigger:
     runs-on: ubuntu-latest
