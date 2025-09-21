@@ -12,19 +12,22 @@ on:
     # Запускать еженедельно, например, в воскресенье в 01:00 UTC
     - cron: '0 1 * * 0'
 
-
+# Определяем версии как переменные верхнего уровня для использования в env
 env:
+  # Версии
   QT_VERSION: "6.8.0"
   FFMPEG_VERSION: "7.1.2"
+  # Директории
   BUILD_DIR: ${{ github.workspace }}/build_env
   INSTALL_PREFIX: ${{ github.workspace }}/cached_install
+  # URL и Архивы Qt
   QT_BASE_URL: "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_680/qt6_680/qt.qt6.680.linux_gcc_64"
-  # --- Обновленный список архивов ---
+  # Список архивов (разделитель - пробел или новая строка)
   QT_ARCHIVES: >
     6.8.0-0-202410030750icu-linux-Rhel8.6-x86_64.7z
     6.8.0-0-202410030750qtbase-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
-  # -------------------------------
-  CACHE_KEY: "build-env-qt${{ env.QT_VERSION }}-ffmpeg${{ env.FFMPEG_VERSION }}-v2" # Увеличил версию кэша
+  # Ключ кэша (обновите версию при изменении конфигурации)
+  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3" 
 
 jobs:
   prepare:
@@ -57,7 +60,11 @@ jobs:
           echo "Starting Qt download and installation..."
           
           # Итерируем по списку архивов
-          for archive in ${{ env.QT_ARCHIVES }}; do
+          # Используем read с разделителем по умолчанию (пробел/новая строка)
+          echo "${{ env.QT_ARCHIVES }}" | while read -r archive; do
+            # Пропускаем пустые строки
+            if [ -z "$archive" ]; then continue; fi
+            
             echo "Downloading $archive..."
             wget -q "${{ env.QT_BASE_URL }}/$archive"
             
