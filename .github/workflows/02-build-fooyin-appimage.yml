@@ -27,7 +27,7 @@ env:
   QT_VERSION: "6.8.0"
   FFMPEG_VERSION: "7.1.2"
   # Директории
-  INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
+  INSTALL_PREFIX: ${{ github.workspace }}/cached_install
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
   # Ключ кэша (должен совпадать с 01-prepare-and-cache-env.yml)
   CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3"
