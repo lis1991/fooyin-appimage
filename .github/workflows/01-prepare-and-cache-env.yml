@@ -59,13 +59,20 @@ jobs:
         run: |
           echo "Starting Qt download and installation..."
           
-          # Итерируем по списку архивов
-          # Используем read с разделителем по умолчанию (пробел/новая строка)
-          echo "${{ env.QT_ARCHIVES }}" | while read -r archive; do
-            # Пропускаем пустые строки
-            if [ -z "$archive" ]; then continue; fi
+          # Преобразуем переменную окружения в массив Bash
+          # Это позволяет корректно итерироваться по каждому архиву
+          IFS=' ' read -r -a archives <<< "${{ env.QT_ARCHIVES }}"
+          
+          # Итерируем по массиву
+          for archive in "${archives[@]}"; do
+            # Пропускаем пустые строки (на случай лишних пробелов)
+            if [ -z "$archive" ]; then 
+              echo "Skipping empty archive entry."
+              continue
+            fi
             
             echo "Downloading $archive..."
+            # ВАЖНО: Нет лишних пробелов в строке URL
             wget -q "${{ env.QT_BASE_URL }}/$archive"
             
             # Опционально: Проверка контрольной суммы (используя .sha1 файл)
