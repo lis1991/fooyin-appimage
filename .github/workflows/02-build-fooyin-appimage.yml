@@ -196,10 +196,7 @@ jobs:
             # Зависимости OpenGL, необходимые для Qt Gui/Widgets
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
             # Другие потенциально необходимые зависимости (на случай, если их нет в базовой среде или кэше)
-            build-essential cmake git pkg-config #\
-            #libpulse-dev libasound2-dev libtag1-dev \
-            #libavcodec-dev libavformat-dev libavutil-dev libswresample-dev \
-            #libicu-dev
+            build-essential cmake git pkg-config 
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
