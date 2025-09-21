@@ -47,9 +47,22 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_call" ]]; then
             REF="${{ github.event.inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            REF="${{ github.event.pull_request.head.sha }}"
+            # Для PR можно, например, использовать тот же ref, что и в основном репо,
+            # или захардкодить ветку, например, master.
+            # Сейчас возьмем SHA из PR, но это может не сработать, если его нет в fooyin/fooyin
+            # Лучше захардкодить ветку для PR.
+            REF="master"
+            # Или если вы хотите использовать SHA из PR (рискованно):
+            # REF="${{ github.event.pull_request.head.sha }}"
           else # push
-            REF="${{ github.sha }}"
+            # Для push в ваш репозиторий определяем "стандартный" ref для fooyin/fooyin
+            # Это может быть "master", "main" или, например, последний тег.
+            REF="master"
+            # Альтернатива: последний тег
+            # REF=$(git ls-remote --tags https://github.com/fooyin/fooyin.git | grep -v '{}\|-' | tail -n 1 | awk '{print $2}' | sed 's|refs/tags/||')
+            # if [ -z "$REF" ]; then
+            #   REF="master" # fallback
+            # fi
           fi
           echo "REF=$REF" >> $GITHUB_ENV
           echo "ref=$REF" >> $GITHUB_OUTPUT
