@@ -293,7 +293,7 @@ jobs:
 
       # --- СОХРАНЕНИЕ КЭША ---
       - name: Save build environment to cache
-        if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         uses: actions/cache/save@v4
         with:
           path: ${{ env.INSTALL_PREFIX }}
