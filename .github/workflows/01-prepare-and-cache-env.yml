@@ -152,6 +152,95 @@ jobs:
           make install
           echo "FFmpeg build and install completed."
 
+
+      # --- СБОРКА TAGLIB ---
+      - name: Download, Build and Install TagLib
+        # if: steps.cache-check.outputs.cache-hit != 'true' || github.event.inputs.force_rebuild == 'true'
+        run: |
+          echo "Starting TagLib download, build and install process..."
+          
+          cd ${{ env.BUILD_DIR }}
+          
+          # 1. Определение последнего релиза TagLib
+          echo "Fetching latest TagLib release info from GitHub..."
+          # Используем GitHub API для получения последнего релиза
+          LATEST_RELEASE_JSON=$(curl -s https://api.github.com/repos/taglib/taglib/releases/latest)
+          
+          # Извлекаем URL архива исходного кода (.tar.gz)
+          TAGLIB_TAR_GZ_URL=$(echo "$LATEST_RELEASE_JSON" | jq -r '.tarball_url')
+          # Извлекаем версию (tag name)
+          TAGLIB_VERSION=$(echo "$LATEST_RELEASE_JSON" | jq -r '.tag_name')
+          
+          if [ -z "$TAGLIB_TAR_GZ_URL" ] || [ "$TAGLIB_TAR_GZ_URL" == "null" ]; then
+            echo "Error: Could not determine TagLib download URL from GitHub API response."
+            echo "Response snippet: $(echo "$LATEST_RELEASE_JSON" | head -n 5)"
+            exit 1
+          fi
+          
+          if [ -z "$TAGLIB_VERSION" ] || [ "$TAGLIB_VERSION" == "null" ]; then
+            echo "Warning: Could not determine TagLib version from GitHub API response. Using 'latest'."
+            TAGLIB_VERSION="latest"
+          fi
+          
+          echo "Latest TagLib release identified: $TAGLIB_VERSION"
+          echo "Download URL: $TAGLIB_TAR_GZ_URL"
+          
+          # 2. Скачивание архива
+          echo "Downloading TagLib $TAGLIB_VERSION source code..."
+          wget -O taglib-$TAGLIB_VERSION.tar.gz "$TAGLIB_TAR_GZ_URL"
+          
+          # 3. Распаковка
+          echo "Extracting TagLib source code..."
+          tar -xzf taglib-$TAGLIB_VERSION.tar.gz
+          
+          # Найдем имя распакованной директории (оно может быть вроде taglib-taglib-<hash>)
+          TAGLIB_SOURCE_DIR=$(find . -maxdepth 1 -type d -name "taglib-*" | grep -v "\.tar\.gz" | head -n 1)
+          
+          if [ -z "$TAGLIB_SOURCE_DIR" ] || [ ! -d "$TAGLIB_SOURCE_DIR" ]; then
+            echo "Error: Could not find extracted TagLib source directory."
+            echo "Contents of build directory:"
+            ls -la
+            exit 1
+          fi
+          
+          echo "TagLib source directory found: $TAGLIB_SOURCE_DIR"
+          
+          # 4. Переход в директорию сборки
+          cd "$TAGLIB_SOURCE_DIR"
+          mkdir -p build && cd build
+          
+          # 5. Конфигурация CMake
+          echo "Configuring TagLib build with CMake..."
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON # Fooyin обычно использует разделяемые библиотеки
+            
+          # 6. Сборка
+          echo "Building TagLib..."
+          make -j$(nproc)
+          
+          # 7. Установка
+          echo "Installing TagLib to ${{ env.INSTALL_PREFIX }}..."
+          make install
+          
+          # 8. Проверка установки (опционально)
+          echo "TagLib build and install process completed."
+          echo "Checking for installed library..."
+          if [ -f "${{ env.INSTALL_PREFIX }}/lib/libtag.so" ] || [ -f "${{ env.INSTALL_PREFIX }}/lib/libtag.so.1" ]; then
+            echo "TagLib library found in install prefix."
+          else
+            echo "Warning: TagLib library (.so) not found in ${{ env.INSTALL_PREFIX }}/lib/ after installation."
+          fi
+          
+          # 9. Очистка (опционально, для экономии места в кэше)
+          echo "Cleaning up build directory..."
+          cd ${{ env.BUILD_DIR }}
+          rm -rf taglib-$TAGLIB_VERSION.tar.gz "$TAGLIB_SOURCE_DIR"
+          
+          echo "TagLib processing finished."
+
+
       # --- СОХРАНЕНИЕ КЭША ---
       - name: Save build environment to cache
         if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
