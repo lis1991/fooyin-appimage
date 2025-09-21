@@ -196,7 +196,7 @@ jobs:
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
             build-essential cmake git pkg-config \
             libxkbcommon-dev \
-            vulkan-headers
+            libvulkan-dev
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
