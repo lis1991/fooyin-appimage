@@ -124,7 +124,24 @@ jobs:
           ./configure -prefix ${{ env.INSTALL_PREFIX }} \
             -opensource -confirm-license \
             -nomake examples -nomake tests \
+            # Отключаем ненужные модули
             -skip qtwebengine \
+            -skip qtquick3d \
+            -skip qt3d \
+            -skip qtlocation \
+            -skip qtwebchannel \
+            -skip qtwebview \
+            -skip qtcharts \
+            -skip qtpurchasing \
+            -skip qtremoteobjects \
+            -skip qtscxml \
+            -skip qtvirtualkeyboard \
+            -skip qtquicktimeline \
+            -skip qtshadertools \
+            -skip qtactiveqt \
+            -skip qtopcua \
+            -skip qtquick3dphysics \
+            -skip qtquickeffectmaker \
             -system-zlib -system-libpng -system-libjpeg \
             -no-rpath \
             -shared \
