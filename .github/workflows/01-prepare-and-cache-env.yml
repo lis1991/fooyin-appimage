@@ -208,6 +208,13 @@ jobs:
           # 4. Переход в директорию сборки
           cd "$TAGLIB_SOURCE_DIR"
           mkdir -p build && cd build
+
+          git submodule update --init --recursive
+          if [ -d "libs/utf8cpp" ] || [ -d "external/utf8cpp" ] || find . -type d -name "utf8cpp" | grep -q . ; then
+             echo "utf8cpp submodule directory found."
+          else
+             echo "Warning: utf8cpp submodule directory not found after update. Check submodule paths."
+          fi
           
           # 5. Конфигурация CMake
           echo "Configuring TagLib build with CMake..."
