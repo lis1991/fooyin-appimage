@@ -106,8 +106,8 @@ jobs:
           python-version: '3.10'
       - run: |
           sudo pip install --upgrade pip
-          sudo pip install appimage-builder
-          #pip install appimage-builder==0.8.2
+          #sudo pip install appimage-builder
+          sudo pip install appimage-builder==0.8.2
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
