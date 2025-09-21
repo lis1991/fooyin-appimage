@@ -39,12 +39,12 @@ jobs:
   prepare:
     runs-on: ubuntu-22.04
     steps:
-      - name: Check for existing cache
-        id: cache-check
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.INSTALL_PREFIX }}
-          key: ${{ env.CACHE_KEY }}
+      #- name: Check for existing cache
+        #id: cache-check
+        #uses: actions/cache/restore@v4
+        #with:
+          #path: ${{ env.INSTALL_PREFIX }}
+          #key: ${{ env.CACHE_KEY }}
 
       - name: Setup directories
         #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
