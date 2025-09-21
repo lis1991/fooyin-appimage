@@ -21,6 +21,12 @@ jobs:
       BUILD_DIR: ${{ github.workspace }}/build
       INSTALL_PREFIX: ${{ github.workspace }}/AppDir/usr/local
       FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
+      QT_BASE_URL: "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_680/qt6_680/qt.qt6.680.linux_gcc_64"
+      # Определяем имена файлов, которые нужно скачать
+      QT_BASE_ARCHIVE: "Qt_Base-6.8.0-linux_gcc_64.7z"
+      QT_TOOLS_ARCHIVE: "qttools-6.8.0-linux_gcc_64.7z" # Для qmake, lrelease и т.д.
+      # Если Fooyin использует QML, может понадобиться qtdeclarative
+      # QT_DECLARATIVE_ARCHIVE: "qtdeclarative-6.8.0-linux_gcc_64.7z"
 
     steps:
       - name: Checkout this repo (for recipe.yml)
@@ -54,16 +60,18 @@ jobs:
           mkdir -p ${{ env.BUILD_DIR }}
           mkdir -p ${{ env.INSTALL_PREFIX }}
 
-      - name: Cache Qt and FFmpeg build
+      # --- КЭШИРОВАНИЕ ДЛЯ QT, FFMPEG и Fooyin build dir ---
+      - name: Cache Qt, FFmpeg build and Fooyin build
         uses: actions/cache@v4
         id: build-cache
         with:
           path: |
             ${{ env.INSTALL_PREFIX }}
-            ${{ env.BUILD_DIR }}/qt-everywhere-src-${{ env.QT_VERSION }}
             ${{ env.BUILD_DIR }}/ffmpeg-${{ env.FFMPEG_VERSION }}
-          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-${{ hashFiles('**/recipe.yml') }}
+            ${{ env.FOYIN_SOURCE_DIR }}/build # Кэшируем build dir Fooyin
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-fooyin-${{ env.TAG }}-${{ hashFiles('**/recipe.yml') }}
           restore-keys: |
+            ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-fooyin-${{ env.TAG }}-
             ${{ runner.os }}-qt-${{ env.QT_VERSION }}-ffmpeg-${{ env.FFMPEG_VERSION }}-
 
       - name: Set up Python
@@ -72,37 +80,94 @@ jobs:
         with:
           python-version: '3.10'
 
-      #- name: Install appimage-builder
-        #if: steps.build-cache.outputs.cache-hit != 'true'
-        #run: pip install appimage-builder
-      - name: Install appimage-builder
+      - name: Install appimage-builder and dependencies
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
-          pip install appimage-builder==0.8.2
-
-      - name: Install system dependencies
-        if: steps.build-cache.outputs.cache-hit != 'true'
-        run: |
+          # Установка необходимых инструментов
           sudo apt-get update
-          # Добавьте в список apt-get install:
           sudo apt-get install -y \
-            llvm-dev libclang-dev clang
-          sudo apt-get install -y \
-            build-essential cmake git pkg-config wget ninja-build \
+            p7zip-full wget cmake build-essential git \
             libgl1-mesa-dev libxcb1-dev libx11-dev libx11-xcb-dev \
             libxext-dev libxfixes-dev libxi-dev libxrender-dev \
             libxrandr-dev libxcursor-dev libxinerama-dev libxss-dev \
             libglib2.0-dev libicu-dev libzstd-dev libbz2-dev liblzma-dev \
             libva-dev libvdpau-dev libvorbis-dev libopus-dev \
             libmp3lame-dev libfdk-aac-dev yasm nasm
+            
+          pip install appimage-builder
 
+      # --- СКАЧИВАНИЕ И УСТАНОВКА ПРЕДКОМПИЛИРОВАННОГО QT ---
+      - name: Download and Install Prebuilt Qt 6.8.0
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          
+          # Скачиваем основные библиотеки Qt Base
+          echo "Downloading Qt Base..."
+          wget -q ${{ env.QT_BASE_URL }}/${{ env.QT_BASE_ARCHIVE }}
+          
+          # Скачиваем инструменты Qt (qmake и др.)
+          echo "Downloading Qt Tools..."
+          wget -q ${{ env.QT_BASE_URL }}/${{ env.QT_TOOLS_ARCHIVE }}
+          
+          # Если нужно QML:
+          # echo "Downloading Qt Declarative (QML)..."
+          # wget -q ${{ env.QT_BASE_URL }}/${{ env.QT_DECLARATIVE_ARCHIVE }}
+          
+          # Создаем временную директорию для распаковки
+          mkdir -p temp_qt
+          cd temp_qt
+          
+          # Распаковываем архивы
+          echo "Extracting Qt Base..."
+          7z x ../${{ env.QT_BASE_ARCHIVE }}
+          echo "Extracting Qt Tools..."
+          7z x ../${{ env.QT_TOOLS_ARCHIVE }}
+          # echo "Extracting Qt Declarative..."
+          # 7z x ../${{ env.QT_DECLARATIVE_ARCHIVE }}
+          
+          # Находим распакованную директорию Qt (обычно внутри архива путь вроде 6.8.0/)
+          # и копируем её содержимое в INSTALL_PREFIX
+          # Предполагаем, что структура внутри архива: 6.8.0/gcc_64/
+          QT_SOURCE_DIR="6.8.0/gcc_64"
+          
+          if [ ! -d "$QT_SOURCE_DIR" ]; then
+              echo "Error: Expected Qt source directory '$QT_SOURCE_DIR' not found after extraction."
+              echo "Contents of temp_qt:"
+              ls -R
+              exit 1
+          fi
+          
+          echo "Copying Qt to ${{ env.INSTALL_PREFIX }}..."
+          mkdir -p ${{ env.INSTALL_PREFIX }}
+          cp -r $QT_SOURCE_DIR/* ${{ env.INSTALL_PREFIX }}/
+          
+          # Делаем qmake исполняемым
+          if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
+              chmod +x ${{ env.INSTALL_PREFIX }}/bin/qmake
+          fi
+          
+          # Проверяем установку
+          echo "Qt installation check:"
+          if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
+              ${{ env.INSTALL_PREFIX }}/bin/qmake -v
+          else
+              echo "Warning: qmake not found in ${{ env.INSTALL_PREFIX }}/bin/"
+          fi
+          
+          # Очищаем
+          cd ..
+          rm -rf temp_qt ${{ env.QT_BASE_ARCHIVE }} ${{ env.QT_TOOLS_ARCHIVE }}
+
+      # --- СБОРКА FFMPEG (ТОЛЬКО ЕСЛИ НЕТ В КЭШЕ) ---
       - name: Build and install FFmpeg
         if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           cd ${{ env.BUILD_DIR }}
-          # Исправлено: Убраны лишние пробелы в URL
-          wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
-          tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          if [ ! -d "ffmpeg-${{ env.FFMPEG_VERSION }}" ]; then
+              wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+              tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          fi
           cd ffmpeg-${{ env.FFMPEG_VERSION }}
           ./configure \
             --prefix=${{ env.INSTALL_PREFIX }} \
@@ -113,67 +178,36 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: Build and install Qt
-        if: steps.build-cache.outputs.cache-hit != 'true'
-        run: |
-          cd ${{ env.BUILD_DIR }}
-          # Исправлено: Убраны лишние пробелы в URL
-          wget -q https://download.qt.io/archive/qt/6.8/${{ env.QT_VERSION }}/single/qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
-          tar xf qt-everywhere-src-${{ env.QT_VERSION }}.tar.xz
-          cd qt-everywhere-src-${{ env.QT_VERSION }}
-          ./configure -prefix ${{ env.INSTALL_PREFIX }} \
-            -opensource -confirm-license \
-            -nomake examples -nomake tests \
-            # Отключаем ненужные модули
-            -skip qtwebengine \
-            -skip qtquick3d \
-            -skip qt3d \
-            -skip qtlocation \
-            -skip qtwebchannel \
-            -skip qtwebview \
-            -skip qtcharts \
-            -skip qtpurchasing \
-            -skip qtremoteobjects \
-            -skip qtscxml \
-            -skip qtvirtualkeyboard \
-            -skip qtquicktimeline \
-            -skip qtshadertools \
-            -skip qtactiveqt \
-            -skip qtopcua \
-            -skip qtquick3dphysics \
-            -skip qtquickeffectmaker \
-            -system-zlib -system-libpng -system-libjpeg \
-            -no-rpath \
-            -shared \
-            -I ${{ env.INSTALL_PREFIX }}/include \
-            -L ${{ env.INSTALL_PREFIX }}/lib \
-            #-D LLVM_ROOT=/usr/lib/llvm-15 \        # <-- Добавлено
-            #-D CLANG_ROOT=/usr/lib/llvm-15 \       # <-- Добавлено
-            -no-feature-clangcppchecks \  # <-- Отключает проверки Clang C++
-            -no-feature-zstd \            # <-- Иногда помогает избежать проблем с зависимостями
-            -- \
-            -DFEATURE_ffmpeg=ON \
-            -DFFMPEG_ROOT=${{ env.INSTALL_PREFIX }} \
-            #-DCMAKE_C_COMPILER=clang-15 \          # <-- Добавлено
-            #-DCMAKE_CXX_COMPILER=clang++-15 \      # <-- Добавлено
-            -GNinja
-          ninja
-          ninja install
-
+      # --- СБОРКА FOYIN (используя кэш или нет) ---
       - name: Build Fooyin
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
           mkdir -p build && cd build
+          
+          # Используем qmake из установленного Qt
+          echo "Configuring Fooyin with CMake..."
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_BUILD_TYPE=Release
+          echo "Building Fooyin..."
+          cmake --build . --parallel
+          echo "Installing Fooyin..."
           cmake --build . --parallel --target install
 
       - name: Prepare AppDir (Desktop file and icon)
         run: |
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
-          printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
+          cat > ${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop <<'EOF'
+[Desktop Entry]
+Name=Fooyin
+Exec=fooyin %F
+Type=Application
+Icon=fooyin
+Categories=AudioVideo;Player;
+Comment=A customisable music player
+MimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;
+EOF
           ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
           if [ -f "$ICON_SRC_PATH" ]; then
             mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
@@ -188,6 +222,7 @@ jobs:
         id: clean-version
         run: |
           CLEAN_VERSION=${{ env.TAG }}
+          # Убираем ведущую 'v', если есть
           CLEAN_VERSION=${CLEAN_VERSION#v}
           echo "VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
@@ -213,7 +248,7 @@ jobs:
             Automatic AppImage build for Fooyin ${{ env.TAG }}
 
             **Includes:**
-            - Qt ${{ env.QT_VERSION }}
+            - Qt ${{ env.QT_VERSION }} (Prebuilt)
             - FFmpeg ${{ env.FFMPEG_VERSION }}
 
             Built from: https://github.com/fooyin/fooyin/releases/tag/${{ env.TAG }}
