@@ -209,12 +209,50 @@ jobs:
           cd "$TAGLIB_SOURCE_DIR"
           mkdir -p build && cd build
 
-          git submodule update --init --recursive
-          if [ -d "libs/utf8cpp" ] || [ -d "external/utf8cpp" ] || find . -type d -name "utf8cpp" | grep -q . ; then
-             echo "utf8cpp submodule directory found."
+
+          
+
+          # Проверим, существует ли .gitmodules или упоминание utf8cpp в CMakeLists.txt
+          if grep -q "utf8cpp" "$TAGLIB_SOURCE_DIR/CMakeLists.txt" || [ -f "$TAGLIB_SOURCE_DIR/.gitmodules" ]; then
+              echo "Detected potential need for utf8cpp based on CMakeLists.txt or .gitmodules."
+              # Создаем директорию для submodule
+              mkdir -p "$TAGLIB_SOURCE_DIR/3rdparty"
+              cd "$TAGLIB_SOURCE_DIR/3rdparty"
+              
+              # Скачиваем содержимое utf8cpp submodule
+              # Используем последний коммит из основной ветки репозитория nemtrif/utf8cpp на момент анализа
+              # Можно заменить на конкретный коммит, если нужно.
+              UTF8CPP_COMMIT="master" # Или конкретный хэш коммита, например: "a1b2c3d4e5f6..."
+              echo "Downloading utf8cpp submodule ($UTF8CPP_COMMIT)..."
+              wget -qO- "https://github.com/nemtrif/utf8cpp/archive/$UTF8CPP_COMMIT.tar.gz" | tar xz
+              
+              # Переименовываем распакованную директорию в utf8cpp
+              UTF8CPP_EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "utf8cpp-*" | head -n 1)
+              if [ -n "$UTF8CPP_EXTRACTED_DIR" ] && [ -d "$UTF8CPP_EXTRACTED_DIR" ]; then
+                  mv "$UTF8CPP_EXTRACTED_DIR" utf8cpp
+                  echo "utf8cpp submodule placed into $TAGLIB_SOURCE_DIR/3rdparty/utf8cpp"
+                  
+                  # Проверим, есть ли там CMakeLists.txt или include
+                  if [ -f "utf8cpp/CMakeLists.txt" ] || [ -d "utf8cpp/source" ]; then
+                      echo "utf8cpp content verified."
+                  else
+                      echo "Warning: utf8cpp content might be unexpected. Check structure."
+                  fi
+              else
+                  echo "Error: Failed to extract or find utf8cpp directory."
+                  ls -la
+                  exit 1
+              fi
+              # Вернемся в директорию сборки TagLib
+              cd "$TAGLIB_SOURCE_DIR/build"
           else
-             echo "Warning: utf8cpp submodule directory not found after update. Check submodule paths."
+              echo "utf8cpp not detected as a dependency in TagLib source. Skipping manual submodule setup."
           fi
+
+
+
+          
+
           
           # 5. Конфигурация CMake
           echo "Configuring TagLib build with CMake..."
