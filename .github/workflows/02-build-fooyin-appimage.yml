@@ -198,22 +198,14 @@ jobs:
             build-essential cmake git pkg-config \
             libxkbcommon-dev \
             libvulkan-dev \
-            # Дополнительные библиотеки для плагинов Fooyin (опционально)
-            libgme-dev \        
-            # Game Music Emu
-            libarchive-dev \    
-            # Работа с архивами
-            libopenmpt-dev \    
-            # OpenMPT
-            libpipewire-0.3-dev \ 
-            # PipeWire
-            libsdl2-dev \       
-            # SDL
-            libsndfile1-dev \   
-            # SndFile
-            libebur128-dev \    
-            # EBU R128
-            ccache \
+            libgme-dev \
+            libarchive-dev \
+            libopenmpt-dev \
+            libpipewire-0.3-dev \
+            libsdl2-dev \
+            libsndfile1-dev \
+            libebur128-dev \
+            ccache
 
             
       - name: Setup ccache
