@@ -306,7 +306,9 @@ jobs:
           export VERSION=${{ env.VERSION }}
           # Предполагается, что recipe.yml находится в корне репозитория,
           # из которого запускается этот workflow.
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
           appimage-builder --recipe recipe.yml --skip-test
+          
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
