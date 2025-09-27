@@ -185,10 +185,11 @@ jobs:
           python-version: '3.10'
       - run: |
           sudo apt install -y binutils coreutils desktop-file-utils fakeroot fuse libgdk-pixbuf2.0-dev patchelf python3-pip python3-setuptools squashfs-tools strace util-linux zsync
-          sudo pip install --upgrade pip
+          pip3 install --upgrade pip
           #sudo pip3 install appimage-builder
-          sudo pip3 index versions appimage-builder
-          sudo pip3 install appimage-builder==0.8.2
+          pip3 index versions appimage-builder
+          #pip3 install appimage-builder==0.8.2
+          pip3 install appimage-builder==1.1.0
 
       # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
       - name: Install system dependencies for Fooyin build (including OpenGL)
@@ -322,7 +323,7 @@ jobs:
           export VERSION=${{ env.VERSION }}
           # Предполагается, что recipe.yml находится в корне репозитория,
           # из которого запускается этот workflow.
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
+          #sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
           appimage-builder --recipe recipe.yml --skip-test
           
 
