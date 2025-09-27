@@ -1,20 +1,10 @@
 version: 1
-# --- ДОБАВИТЬ СЕКЦИЮ apt ---
-apt:
-  # Эти флаги передаются apt-get update внутри изолированной среды appimage-builder
-  # и отключают проверку подписей, устраняя ошибку NO_PUBKEY.
-  # См.: https://github.com/AppImageCrafters/appimage-builder/issues/177#issuecomment-1201332301
-  allow_unauthenticated: yes
-  architecture: amd64
-  # (Опционально) Можно указать дополнительные флаги для apt.conf
-  # apt_conf:
-  #   - "Acquire::Check-Valid-Until \"false\";"
-  #   - "Acquire::AllowInsecureRepositories \"true\";"
-  #   - "APT::Get::AllowUnauthenticated \"true\";"
-# --- КОНЕЦ ДОБАВЛЕНИЯ ---
 
 AppDir:
   path: ./AppDir
+  apt:
+    architecture: amd64
+    allow_unauthenticated: yes
   app_info:
     id: org.fooyin.Fooyin
     name: Fooyin
