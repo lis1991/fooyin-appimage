@@ -2,13 +2,14 @@ version: 1
 
 AppDir:
   path: ./AppDir
+
   apt:
     arch: amd64
     allow_unauthenticated: true
     sources:
       - sourceline: 'deb http://archive.ubuntu.com/ubuntu jammy main universe'
       - sourceline: 'deb http://archive.ubuntu.com/ubuntu jammy-updates main universe'
-    packages:
+    include:
       - libc6
       - libstdc++6
       - libglib2.0-0
@@ -25,6 +26,7 @@ AppDir:
       - libdbus-1-3
       - libfreetype6
       - libfontconfig1
+      
   app_info:
     id: org.fooyin.Fooyin
     name: Fooyin
