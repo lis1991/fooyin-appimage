@@ -232,6 +232,11 @@ jobs:
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}/build
           echo "Starting Fooyin build with ccache..."
+
+          # Создаем (или очищаем, если существует) и переходим в директорию сборки
+          echo "Creating build directory..."
+          rm -rf build # Убедимся, что предыдущая сборка не мешает
+          mkdir -p build && cd build
           
           # Показываем статистику ccache перед сборкой
           echo "ccache stats before config/build:"
