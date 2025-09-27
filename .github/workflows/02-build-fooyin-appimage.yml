@@ -199,6 +199,7 @@ jobs:
             libxkbcommon-dev \
             libvulkan-dev \
             ccache
+            
       - name: Setup ccache
         run: |
           echo "Setting up ccache..."
@@ -219,26 +220,43 @@ jobs:
           echo "Initial ccache stats:"
           ccache -s
           
-          # Настраиваем CMake использовать ccache через переменные окружения для компиляторов
-          # Это заставит CMake использовать ccache в качестве "launcher" для gcc/g++
-          echo "CC=ccache gcc" >> $GITHUB_ENV
-          echo "CXX=ccache g++" >> $GITHUB_ENV
+          # НЕ НУЖНО устанавливать CC/CXX здесь для CMake.
+          # Вместо этого будем использовать флаги CMAKE при вызове cmake.
+          # echo "CC=ccache gcc" >> $GITHUB_ENV  # <-- Удалить
+          # echo "CXX=ccache g++" >> $GITHUB_ENV # <-- Удалить
           
           echo "ccache setup complete."
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
         run: |
-          cd ${{ env.FOYIN_SOURCE_DIR }}
-          mkdir -p build && cd build
+          cd ${{ env.FOYIN_SOURCE_DIR }}/build
+          echo "Starting Fooyin build with ccache..."
+          
+          # Показываем статистику ccache перед сборкой
+          echo "ccache stats before config/build:"
           ccache -s
+          
+          # --- КОНФИГУРАЦИЯ CMAKE с ccache launcher ---
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          
+          # --- СБОРКА ---
+          # Запускаем сборку с ограниченным параллелизмом, как обсуждалось ранее, чтобы снизить нагрузку на память
           cmake --build . --parallel 1
+          
+          # --- УСТАНОВКА ---
+          cmake --build . --parallel 1 --target install
+          
+          echo "Fooyin build/install completed."
+          
+          # Показываем статистику ccache после сборки
+          echo "ccache stats after build:"
           ccache -s
-          cmake --build . --parallel --target install
 
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
       - name: Prepare AppDir (Desktop file and icon)
