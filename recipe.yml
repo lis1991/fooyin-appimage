@@ -1,14 +1,26 @@
 version: 1
 
+script:
+  - rm -r ./AppDir || true
+
 AppDir:
   path: ./AppDir
 
+  app_info:
+    id: org.fooyin.Fooyin
+    name: Fooyin
+    icon: fooyin
+    version: !ENV ${VERSION}
+    exec: usr/local/bin/fooyin
+    exec_args: $@
+
   apt:
     arch: amd64
-    allow_unauthenticated: true
     sources:
-      - sourceline: 'deb http://archive.ubuntu.com/ubuntu jammy main universe'
-      - sourceline: 'deb http://archive.ubuntu.com/ubuntu jammy-updates main universe'
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main universe'
+        key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main universe'
+        key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
     include:
       - libc6
       - libstdc++6
@@ -26,22 +38,6 @@ AppDir:
       - libdbus-1-3
       - libfreetype6
       - libfontconfig1
-      
-  app_info:
-    id: org.fooyin.Fooyin
-    name: Fooyin
-    icon: fooyin
-    version: !ENV ${VERSION}
-    exec: usr/local/bin/fooyin
-    exec_args: $@
-
-  runtime:
-    env:
-      LD_LIBRARY_PATH: "${APPDIR}/usr/local/lib:${APPDIR}/usr/local/lib/x86_64-linux-gnu:${APPDIR}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
-      QT_PLUGIN_PATH: "${APPDIR}/usr/local/lib/qt6/plugins:${APPDIR}/usr/local/lib/x86_64-linux-gnu/qt6/plugins"
-      QML2_IMPORT_PATH: "${APPDIR}/usr/local/lib/qt6/qml:${APPDIR}/usr/local/lib/x86_64-linux-gnu/qt6/qml"
-      QT_QPA_PLATFORM_PLUGIN_PATH: "${APPDIR}/usr/local/lib/qt6/plugins/platforms:${APPDIR}/usr/local/lib/x86_64-linux-gnu/qt6/plugins/platforms"
-      PATH: "${APPDIR}/usr/local/bin:${PATH}"
 
   files:
     include:
@@ -73,6 +69,28 @@ AppDir:
       - usr/share/man
       - usr/local/share/doc
       - usr/local/share/man
+
+  test:
+    ubuntu:
+      image: appimagecrafters/tests-env:ubuntu-jammy
+      command: "./AppRun"
+      use_host_x: True
+    debian:
+      image: appimagecrafters/tests-env:debian-stable
+      command: "./AppRun"
+      use_host_x: True
+    centos:
+      image: appimagecrafters/tests-env:centos-7
+      command: "./AppRun"
+      use_host_x: True
+    arch:
+      image: appimagecrafters/tests-env:archlinux-latest
+      command: "./AppRun"
+      use_host_x: True
+    fedora:
+      image: appimagecrafters/tests-env:fedora-30
+      command: "./AppRun"
+      use_host_x: True
 
 AppImage:
   arch: x86_64
