@@ -184,9 +184,11 @@ jobs:
         with:
           python-version: '3.10'
       - run: |
+          sudo apt install -y binutils coreutils desktop-file-utils fakeroot fuse libgdk-pixbuf2.0-dev patchelf python3-pip python3-setuptools squashfs-tools strace util-linux zsync
           sudo pip install --upgrade pip
-          #sudo pip install appimage-builder
-          sudo pip install appimage-builder==0.8.2
+          #sudo pip3 install appimage-builder
+          sudo pip3 index versions appimage-builder
+          sudo pip3 install appimage-builder==0.8.2
 
       # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
       - name: Install system dependencies for Fooyin build (including OpenGL)
