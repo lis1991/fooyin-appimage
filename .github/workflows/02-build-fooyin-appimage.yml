@@ -208,6 +208,20 @@ jobs:
             ccache
 
             
+      # --- ВОССТАНОВЛЕНИЕ КЭША CCACHE ---
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          # Используем уникальный ключ, зависящий от хэша workflow файла и версий инструментов
+          # Это гарантирует, что кэш будет сброшен при изменении workflow или обновлении компиляторов
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
+          # restore-keys позволяют восстановить совместимый кэш, если точное совпадение не найдено
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-${{ env.QT_VERSION }}-
+            ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-
+            ccache-${{ runner.os }}-
+      
       - name: Setup ccache
         run: |
           echo "Setting up ccache..."
@@ -316,6 +330,15 @@ jobs:
           name: Fooyin-AppImage-${{ env.VERSION }}
           path: Fooyin-*.AppImage*
 
+      # --- СОХРАНЕНИЕ КЭША CCACHE ---
+      - name: Save ccache
+        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
+      
       # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB ---
       - name: Create GitHub Release
         # Создаем релиз только при запуске вручную или через workflow_call (например, из 03-watch-fooyin-releases.yml)
