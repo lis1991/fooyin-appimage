@@ -1,5 +1,9 @@
 version: 1
 
+apt:
+  architecture: amd64
+  allow_unauthenticated: yes
+
 AppDir:
   path: ./AppDir
   apt:
