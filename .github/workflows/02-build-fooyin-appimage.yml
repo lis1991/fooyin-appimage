@@ -190,6 +190,7 @@ jobs:
           pip3 index versions appimage-builder
           #pip3 install appimage-builder==0.8.2
           pip3 install appimage-builder==1.1.0
+          appimage-builder --version
 
       # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
       - name: Install system dependencies for Fooyin build (including OpenGL)
