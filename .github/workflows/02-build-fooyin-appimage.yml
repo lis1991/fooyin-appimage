@@ -197,18 +197,47 @@ jobs:
             libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
             build-essential cmake git pkg-config \
             libxkbcommon-dev \
-            libvulkan-dev
+            libvulkan-dev \
+            ccache
+      - name: Setup ccache
+        run: |
+          echo "Setting up ccache..."
+          # Создаем директорию для кэша ccache
+          mkdir -p ${{ github.workspace }}/ccache
+          
+          # Настраиваем ccache через переменные окружения
+          echo "CCACHE_DIR=${{ github.workspace }}/ccache" >> $GITHUB_ENV
+          echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
+          # Установим мягкий лимит на размер кэша (например, 2 ГБ)
+          echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
+          # Включаем сжатие кэша
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          # (Опционально) Включаем логирование для отладки
+          # echo "CCACHE_LOGFILE=${{ github.workspace }}/ccache.log" >> $GITHUB_ENV
+          
+          # Показываем начальную статистику (должна быть пустой)
+          echo "Initial ccache stats:"
+          ccache -s
+          
+          # Настраиваем CMake использовать ccache через переменные окружения для компиляторов
+          # Это заставит CMake использовать ccache в качестве "launcher" для gcc/g++
+          echo "CC=ccache gcc" >> $GITHUB_ENV
+          echo "CXX=ccache g++" >> $GITHUB_ENV
+          
+          echo "ccache setup complete."
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
           mkdir -p build && cd build
+          ccache -s
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --parallel
+          cmake --build . --parallel 1
+          ccache -s
           cmake --build . --parallel --target install
 
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
