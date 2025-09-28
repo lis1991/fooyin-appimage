@@ -367,6 +367,12 @@ jobs:
           appimage-builder --recipe recipe.yml --skip-test
           #appimage-builder --recipe recipe.yml --skip-test --build-arg VERSION=${{ env.VERSION }}
           
+      - name: Check AppImage files
+        run: |
+          echo "📦 Generated AppImage files:"
+          ls -la Fooyin-*.AppImage*
+          echo "VERSION=${{ env.VERSION }}"
+
 
       # --- СОХРАНЕНИЕ КЭША CCACHE ---
       - name: Save ccache
@@ -377,11 +383,6 @@ jobs:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
 
-      - name: Check AppImage files
-        run: |
-          echo "📦 Generated AppImage files:"
-          ls -la Fooyin-*.AppImage*
-          echo "VERSION=${{ env.VERSION }}"
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
