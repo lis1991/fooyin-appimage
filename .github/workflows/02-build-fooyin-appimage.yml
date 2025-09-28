@@ -325,46 +325,66 @@ jobs:
           echo " "
 
       # --- Определяем версию Fooyin и коммит ---
-      - name: Determine Fooyin Version and Commit
-        id: get_version
+      - name: Set Version from REF
+        id: set-version
         run: |
-          cd ${{ env.FOYIN_SOURCE_DIR }}
-
-          # Пытаемся получить тег текущего коммита
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
-
-          if [ -n "$TAG" ]; then
-            VERSION=${TAG#v}   # Убираем "v" если есть
-          else
-            # Если тега нет, используем короткий SHA
-            VERSION=${GITHUB_SHA::8}
-          fi
-
-          # Коммит для Source Commit
-          COMMIT=$(git rev-parse --short HEAD)
-
+          # Используем REF как версию
+          VERSION="${{ env.REF }}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
-
-          echo "✅ Fooyin version: $VERSION"
-          echo "✅ Source commit: $COMMIT"
+          echo "📦 Using REF as version: $VERSION"
 
 
       - name: Build AppImage
         run: |
           export VERSION=${{ env.VERSION }}
-          # Предполагается, что recipe.yml находится в корне репозитория,
-          # из которого запускается этот workflow.
-          #sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
           appimage-builder --recipe recipe.yml --skip-test
           
+
+      - name: Rename AppImage with version
+        run: |
+          # Переименовываем AppImage используя версию из REF
+          for file in Fooyin-*.AppImage*; do
+            if [[ $file == Fooyin-*.AppImage ]]; then
+              new_name="Fooyin-${{ env.VERSION }}-x86_64.AppImage"
+              mv "$file" "$new_name"
+              echo "📦 Renamed to: $new_name"
+            elif [[ $file == Fooyin-*.AppImage.zsync ]]; then
+              new_name="Fooyin-${{ env.VERSION }}-x86_64.AppImage.zsync"
+              mv "$file" "$new_name"
+              echo "📦 Renamed to: $new_name"
+            fi
+          done
+
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Fooyin-AppImage-${{ env.VERSION }}
-          path: Fooyin-*.AppImage*
+          name: Fooyin-${{ env.VERSION }}-AppImage
+          path: |
+            Fooyin-${{ env.VERSION }}-x86_64.AppImage
+            Fooyin-${{ env.VERSION }}-x86_64.AppImage.zsync
+
+      - name: Create GitHub Release
+        if: ${{ success() }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: fooyin-${{ env.VERSION }}-appimage
+          name: "Fooyin ${{ env.VERSION }} (AppImage)"
+          body: |
+            Automatic AppImage build for Fooyin ${{ env.VERSION }}
+
+            **Build Details:**
+            - **Fooyin Version:** ${{ env.VERSION }}
+            - **Qt Version:** ${{ env.QT_VERSION }} (Prebuilt)
+            - **FFmpeg Version:** ${{ env.FFMPEG_VERSION }}
+            - **Build Date:** $(date -u +"%Y-%m-%d")
+
+            Built from ref: ${{ env.REF }}
+          files: |
+            Fooyin-${{ env.VERSION }}-x86_64.AppImage
+            Fooyin-${{ env.VERSION }}-x86_64.AppImage.zsync
+          prerelease: ${{ !contains(env.VERSION, 'v') && env.VERSION != 'master' }}
+          draft: false
 
       # --- СОХРАНЕНИЕ КЭША CCACHE ---
       - name: Save ccache
@@ -374,22 +394,3 @@ jobs:
         with:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
-      
-      # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB --- 
-      - name: Create GitHub Release
-        if: success()
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.VERSION }}
-          name: "Fooyin ${{ env.VERSION }} (AppImage)"
-          body: |
-            Automatic AppImage build for Fooyin ${{ env.VERSION }}
-
-            **Includes:**
-            - Qt ${{ env.QT_VERSION }} (Prebuilt)
-            - FFmpeg ${{ env.FFMPEG_VERSION }}
-
-            Built from commit: https://github.com/fooyin/fooyin/commit/${{ env.COMMIT }}
-          files: |
-            Fooyin-*.AppImage
-            Fooyin-*.AppImage.zsync
