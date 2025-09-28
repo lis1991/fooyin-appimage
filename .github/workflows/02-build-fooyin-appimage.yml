@@ -341,20 +341,11 @@ jobs:
           appimage-builder --recipe recipe.yml --skip-test
           
 
-      - name: Rename AppImage with version
+      - name: Check AppImage files
         run: |
-          # Переименовываем AppImage используя версию из REF
-          for file in Fooyin-*.AppImage*; do
-            if [[ $file == Fooyin-*.AppImage ]]; then
-              new_name="Fooyin-${{ env.VERSION }}-x86_64.AppImage"
-              mv "$file" "$new_name"
-              echo "📦 Renamed to: $new_name"
-            elif [[ $file == Fooyin-*.AppImage.zsync ]]; then
-              new_name="Fooyin-${{ env.VERSION }}-x86_64.AppImage.zsync"
-              mv "$file" "$new_name"
-              echo "📦 Renamed to: $new_name"
-            fi
-          done
+          echo "📦 Generated AppImage files:"
+          ls -la Fooyin-*.AppImage*
+          echo "VERSION=${{ env.VERSION }}"
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
