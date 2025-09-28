@@ -278,6 +278,7 @@ jobs:
           cmake --build . --parallel 1 --target install
           echo
           find $INSTALL_PREFIX -name fooyin -type f
+          cp -a $INSTALL_PREFIX/bin/fooyin AppDir/bin/
           echo
           echo "Fooyin build/install completed."
           
