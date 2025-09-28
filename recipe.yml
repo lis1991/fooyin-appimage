@@ -1,7 +1,7 @@
 version: 1
 
-script:
-  - rm -r ./AppDir || true
+#script:
+  #- rm -r ./AppDir || true
 
 AppDir:
   path: ./AppDir
