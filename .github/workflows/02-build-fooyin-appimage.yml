@@ -311,11 +311,20 @@ jobs:
             touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
           fi
 
-          ls "$INSTALL_PREFIX/bin/fooyin"
-          mkdir -p "$GITHUB_WORKSPACE/AppDir/bin"
-          ls "$GITHUB_WORKSPACE/AppDir/"
-          cp -a "$INSTALL_PREFIX/bin/fooyin" "$GITHUB_WORKSPACE/AppDir/bin/"
-          ls "$GITHUB_WORKSPACE/AppDir/bin/"
+          ls -la "$INSTALL_PREFIX/bin/"
+          ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"
+          ls -la "$INSTALL_PREFIX/share/applications/"
+          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
+          ls -la "$GITHUB_WORKSPACE/AppDir/"
+          ls -la "$GITHUB_WORKSPACE/AppDir/usr/"
+          cp -a "$INSTALL_PREFIX/bin/*" "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          cp -a "$INSTALL_PREFIX/share/applications/*" "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          cp -a "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/*" "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
+          ls -la "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
 
       - name: Determine Version
         id: get-version
