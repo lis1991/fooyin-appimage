@@ -11,7 +11,7 @@ AppDir:
     name: Fooyin
     icon: fooyin
     version: !ENV ${VERSION}
-    exec: usr/local/bin/fooyin
+    exec: bin/fooyin
     exec_args: $@
 
   apt:
@@ -41,7 +41,7 @@ AppDir:
 
   files:
     include:
-      - usr/local/bin/fooyin
+      - bin/fooyin
       - usr/local/share/applications/fooyin.desktop
       - usr/local/share/icons/hicolor/*/apps/fooyin.png
 
