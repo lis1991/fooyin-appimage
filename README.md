@@ -8,4 +8,4 @@
 
 ---
 
-Собрано с помощью [AppImageTool](https://github.com/AppImage/AppImageKit/).
+Собрано с помощью [AppImageBuilder](https://appimage-builder.readthedocs.io/).
