@@ -377,11 +377,14 @@ jobs:
           body: |
             Automatic AppImage build for Fooyin ${{ env.VERSION }}
 
-            **Includes:**
-            - Qt ${{ env.QT_VERSION }} (Prebuilt)
-            - FFmpeg ${{ env.FFMPEG_VERSION }}
+            **Build Details:**
+            - **Fooyin Version:** ${{ env.VERSION }}
+            - **Qt Version:** ${{ env.QT_VERSION }} (Prebuilt)
+            - **FFmpeg Version:** ${{ env.FFMPEG_VERSION }}
+            - **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            - **Source Commit:** [${{ env.REF }}](https://github.com/fooyin/fooyin/commit/${{ env.REF }})
 
-            Built from: https://github.com/fooyin/fooyin/commit/${{ env.REF }}
+            This is an automated AppImage build.
           files: |
             Fooyin-*.AppImage
             Fooyin-*.AppImage.zsync
