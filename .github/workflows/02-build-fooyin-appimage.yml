@@ -296,26 +296,12 @@ jobs:
         run: |
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/share/applications/fooyin.desktop"
-          #mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
+          cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/fooyin.png"
+          cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/fooyin.desktop"
+
           # Создаем .desktop файл с помощью printf
           #printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
           
-          # Путь к исходной иконке в репозитории Fooyin
-          #ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
-          # Создаем директорию для иконки в AppDir
-          #mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
-          # Проверяем, существует ли иконка в исходниках Fooyin
-          #if [ -f "$ICON_SRC_PATH" ]; then
-            # Если существует, копируем её в AppDir
-            #cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-            #echo "Icon copied from $ICON_SRC_PATH"
-          #else
-            # Если не существует, выводим предупреждение и создаем пустой файл
-            # чтобы избежать ошибок appimage-builder
-            #echo "WARNING: Icon not found at $ICON_SRC_PATH. Creating a placeholder."
-            #touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-          #fi
-
           echo " "
           echo "ls -la "$INSTALL_PREFIX/bin/""
           ls -la "$INSTALL_PREFIX/bin/"
@@ -326,20 +312,6 @@ jobs:
           echo "ls -la "$INSTALL_PREFIX/share/applications/""
           ls -la "$INSTALL_PREFIX/share/applications/"
           echo " "
-          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
-          #echo " "
-          #ls -la "$GITHUB_WORKSPACE/AppDir/"
-          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/"
-          #echo " "
-          #cp -a "$INSTALL_PREFIX/bin/"* "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          #cp -a "$INSTALL_PREFIX/share/applications/"* "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          #cp -a "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"* "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
-          #echo " "
-          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
 
       - name: Determine Version
         id: get-version
