@@ -192,7 +192,7 @@ jobs:
             fakeroot fuse libgdk-pixbuf2.0-dev \
             patchelf python3-pip python3-setuptools \
             squashfs-tools strace util-linux zsync \
-            libgl1-mesa-dev libglu1-mesa-dev \ 
+            libgl1-mesa-dev libglu1-mesa-dev \
             mesa-common-dev freeglut3-dev \
             build-essential cmake git pkg-config \
             libxkbcommon-dev libvulkan-dev \
