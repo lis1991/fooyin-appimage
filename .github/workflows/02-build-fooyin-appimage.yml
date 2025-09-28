@@ -320,6 +320,15 @@ jobs:
           echo "ccache stats after build:"
           ccache -s
 
+      # --- СОХРАНЕНИЕ КЭША CCACHE ---
+      - name: Save ccache
+        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}      
+      
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
       - name: Prepare AppDir (Desktop file and icon)
         run: |
@@ -402,12 +411,3 @@ jobs:
             Fooyin-*-x86_64.AppImage.zsync
           prerelease: ${{ !contains(env.VERSION, 'v') && env.VERSION != 'master' }}
           draft: false
-
-      # --- СОХРАНЕНИЕ КЭША CCACHE ---
-      - name: Save ccache
-        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/ccache
-          key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
