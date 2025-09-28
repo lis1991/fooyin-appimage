@@ -207,7 +207,7 @@ jobs:
             libgme-dev libarchive-dev \
             libopenmpt-dev libpipewire-0.3-dev \
             libsdl2-dev libsndfile1-dev \
-            libebur128-dev ccache
+            libebur128-dev ccache xcb-cursor0 libxcb-cursor0
           pip3 install --upgrade pip
           #sudo pip3 install appimage-builder
           pip3 index versions appimage-builder
