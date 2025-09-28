@@ -37,6 +37,8 @@ AppDir:
       - libxcb-xfixes0
       - libicu70
       - qt6-qpa-plugins
+      - libsqlite3-0
+      - libqt5sql5-sqlite
     exclude:
       - libqt6*
       - qt6-*
