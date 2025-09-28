@@ -340,10 +340,10 @@ jobs:
           
 
       - name: Get Fooyin version
-        id: fooyin_version
         run: |
-          VERSION=$(grep -Po '(?<=project\(fooyin VERSION )[^)]*' $FOYIN_SOURCE_DIR/CMakeLists.txt)
+          VERSION=$(grep -Po '(?<=set\(FOOYIN_VERSION ")[^"]*' $FOYIN_SOURCE_DIR/cmake/version.cmake)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
