@@ -52,6 +52,7 @@ AppDir:
       #- libxcb-randr0
       #- libxcb-xinerama0
       - libxcb-cursor0
+      - xcb-cursor0
 
   files:
     include:
