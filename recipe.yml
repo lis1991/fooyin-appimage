@@ -35,6 +35,7 @@ AppDir:
       - libxcb-cursor0
       - libxcb-randr0
       - libxcb-xfixes0
+      - libicu70
     exclude:
       - libqt6*
       - qt6-*
@@ -43,7 +44,6 @@ AppDir:
       - libavutil*
       - libswresample*
       - libswscale*
-      - libicu70
       - '*-dev'
       - '*-dbg'
       - '*-doc'
