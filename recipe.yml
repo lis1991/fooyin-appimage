@@ -36,6 +36,7 @@ AppDir:
       - libxcb-randr0
       - libxcb-xfixes0
       - libicu70
+      - qt6-qpa-plugins
     exclude:
       - libqt6*
       - qt6-*
