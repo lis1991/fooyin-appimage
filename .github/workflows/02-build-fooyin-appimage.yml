@@ -2,12 +2,12 @@
 name: 02. Build Fooyin AppImage
 
 on:
-  #workflow_dispatch:
-    #inputs:
-      #fooyin_ref:
-        #description: 'Fooyin Git ref (tag/branch/commit, e.g., v0.9.1 or master)'
-        #required: true
-        #default: 'master'
+  workflow_dispatch:
+    inputs:
+      fooyin_ref:
+        description: 'Fooyin Git ref (tag/branch/commit, e.g., v0.9.1 or master)'
+        required: true
+        default: 'master'
   workflow_call:
     inputs:
       fooyin_ref:
