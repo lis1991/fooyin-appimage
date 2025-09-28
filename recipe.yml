@@ -41,28 +41,37 @@ AppDir:
 
   files:
     include:
-      - ../cached_install/bin/fooyin
-      - usr/local/share/applications/fooyin.desktop
-      - usr/local/share/icons/hicolor/*/apps/fooyin.png
+      - bin/fooyin
+      - share/applications/fooyin.desktop
+      - share/icons/hicolor/*/apps/fooyin.png
 
       # Qt 6.8.0 библиотеки
       - usr/local/lib/libQt6*.so.*
       - usr/local/lib/x86_64-linux-gnu/libQt6*.so.*
+      - lib/libQt6*.so.*
+      - lib/x86_64-linux-gnu/libQt6*.so.*
 
       # Qt плагины
       - usr/local/lib/qt6/plugins/**/*
       - usr/local/lib/x86_64-linux-gnu/qt6/plugins/**/*
+      - lib/qt6/plugins/**/*
+      - lib/x86_64-linux-gnu/qt6/plugins/**/*
 
       # Qt QML
       - usr/local/lib/qt6/qml/**/*
       - usr/local/lib/x86_64-linux-gnu/qt6/qml/**/*
+      - lib/qt6/qml/**/*
+      - lib/x86_64-linux-gnu/qt6/qml/**/*
 
       # FFmpeg 7.x
       - usr/local/lib/libav*.so.*
       - usr/local/lib/libsw*.so.*
+      - lib/libav*.so.*
+      - lib/libsw*.so.*
 
       # ICU 76
       - usr/local/lib/libicu*.so.*
+      - lib/libicu*.so.*
 
     exclude:
       - usr/share/doc
