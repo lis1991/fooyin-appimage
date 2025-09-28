@@ -363,7 +363,8 @@ jobs:
       - name: Build AppImage
         run: |
           export VERSION=${{ env.VERSION }}
-          appimage-builder --recipe recipe.yml --skip-test
+          #appimage-builder --recipe recipe.yml --skip-test
+          appimage-builder --recipe recipe.yml --skip-test --build-arg VERSION=${{ env.VERSION }}
           
 
       - name: Check AppImage files
