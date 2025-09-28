@@ -41,7 +41,7 @@ AppDir:
 
   files:
     include:
-      - bin/fooyin
+      - ../cached_install/bin/fooyin
       - usr/local/share/applications/fooyin.desktop
       - usr/local/share/icons/hicolor/*/apps/fooyin.png
 
