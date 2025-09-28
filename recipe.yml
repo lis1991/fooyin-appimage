@@ -94,9 +94,9 @@ AppDir:
       - 'mkspecs/'
 
 
-  test:
-    skip:  
-      all: true  
+  #test:
+    #skip:  
+      #all: true  
 
 AppImage:
   arch: x86_64
