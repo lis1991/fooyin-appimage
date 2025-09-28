@@ -27,7 +27,7 @@ env:
   QT_VERSION: "6.8.0"
   FFMPEG_VERSION: "7.1.2"
   # Директории
-  INSTALL_PREFIX: ${{ github.workspace }}/cached_install
+  INSTALL_PREFIX: ${{ github.workspace }}/AppDir
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
   # Ключ кэша (должен совпадать с 01-prepare-and-cache-env.yml)
   CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3"
@@ -76,7 +76,11 @@ jobs:
           path: ${{ env.FOYIN_SOURCE_DIR }}
 
       - name: Setup AppDir structure
-        run: mkdir -p ${{ env.INSTALL_PREFIX }}
+        run: |
+          mkdir -p ${{ env.INSTALL_PREFIX }}
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
+          mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+        
 
       # --- ВОССТАНОВЛЕНИЕ КЭША СРЕДЫ ---
       - name: Restore cached build environment
@@ -290,44 +294,52 @@ jobs:
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
       - name: Prepare AppDir (Desktop file and icon)
         run: |
-          mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
+          cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/fooyin.png"
+          cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/share/applications/fooyin.desktop"
+          #mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
           # Создаем .desktop файл с помощью printf
-          printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
+          #printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
           
           # Путь к исходной иконке в репозитории Fooyin
-          ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
+          #ICON_SRC_PATH="${{ env.FOYIN_SOURCE_DIR }}/data/icons/fooyin.png"
           # Создаем директорию для иконки в AppDir
-          mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
+          #mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
           # Проверяем, существует ли иконка в исходниках Fooyin
-          if [ -f "$ICON_SRC_PATH" ]; then
+          #if [ -f "$ICON_SRC_PATH" ]; then
             # Если существует, копируем её в AppDir
-            cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-            echo "Icon copied from $ICON_SRC_PATH"
-          else
+            #cp "$ICON_SRC_PATH" ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+            #echo "Icon copied from $ICON_SRC_PATH"
+          #else
             # Если не существует, выводим предупреждение и создаем пустой файл
             # чтобы избежать ошибок appimage-builder
-            echo "WARNING: Icon not found at $ICON_SRC_PATH. Creating a placeholder."
-            touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
-          fi
+            #echo "WARNING: Icon not found at $ICON_SRC_PATH. Creating a placeholder."
+            #touch ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps/fooyin.png
+          #fi
 
+          echo " "
+          echo "ls -la "$INSTALL_PREFIX/bin/""
           ls -la "$INSTALL_PREFIX/bin/"
+          echo " "
+          echo "ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/""
           ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"
+          echo " "
+          echo "ls -la "$INSTALL_PREFIX/share/applications/""
           ls -la "$INSTALL_PREFIX/share/applications/"
           echo " "
-          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
-          echo " "
-          ls -la "$GITHUB_WORKSPACE/AppDir/"
-          ls -la "$GITHUB_WORKSPACE/AppDir/usr/"
-          echo " "
-          cp -a "$INSTALL_PREFIX/bin/"* "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          cp -a "$INSTALL_PREFIX/share/applications/"* "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          cp -a "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"* "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
-          echo " "
-          ls -la "$GITHUB_WORKSPACE/AppDir/usr/bin/"
-          ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
-          ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
+          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          #mkdir -p "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
+          #echo " "
+          #ls -la "$GITHUB_WORKSPACE/AppDir/"
+          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/"
+          #echo " "
+          #cp -a "$INSTALL_PREFIX/bin/"* "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          #cp -a "$INSTALL_PREFIX/share/applications/"* "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          #cp -a "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"* "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
+          #echo " "
+          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/bin/"
+          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/applications/"
+          #ls -la "$GITHUB_WORKSPACE/AppDir/usr/share/icons/hicolor/256x256/apps/"
 
       - name: Determine Version
         id: get-version
