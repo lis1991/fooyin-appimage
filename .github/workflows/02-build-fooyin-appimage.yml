@@ -276,14 +276,13 @@ jobs:
           
           # --- УСТАНОВКА ---
           cmake --build . --parallel 1 --target install
-          echo
+          echo " "
           find $INSTALL_PREFIX -name fooyin -type f
-          #mkdir -p "$GITHUB_WORKSPACE/AppDir/bin"
-          #cp -a $INSTALL_PREFIX/bin/fooyin AppDir/bin/
-          #cp -a "$INSTALL_PREFIX/bin/fooyin" "$GITHUB_WORKSPACE/AppDir/bin/"
-          echo
+          echo " "
           echo "Fooyin build/install completed."
-          
+          echo " "
+          ls -la 
+          echo " "
           # Показываем статистику ccache после сборки
           echo "ccache stats after build:"
           ccache -s
