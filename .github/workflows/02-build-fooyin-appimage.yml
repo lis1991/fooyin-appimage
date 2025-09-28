@@ -401,10 +401,10 @@ jobs:
             Automatic AppImage build for Fooyin ${{ env.VERSION }}
 
             **Build Details:**
-            - **Fooyin Version:** ${{ env.VERSION }}
-            - **Qt Version:** ${{ env.QT_VERSION }} (Prebuilt)
-            - **FFmpeg Version:** ${{ env.FFMPEG_VERSION }}
-            - **Build Date:** $(date -u +"%Y-%m-%d")
+            - **Fooyin Version:** ${{ env.VERSION }} (Auto build from source code)
+            - **Qt Version:** ${{ env.QT_VERSION }} (Prebuilt binary)
+            - **FFmpeg Version:** ${{ env.FFMPEG_VERSION }} (Auto build from source code)
+            - **Build Date:** ${{ github.event.head_commit.timestamp }}
 
             Built from ref: ${{ env.REF }}
           files: |
