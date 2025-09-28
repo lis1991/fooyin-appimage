@@ -39,6 +39,18 @@ AppDir:
       - libfreetype6
       - libfontconfig1
       - libicu70
+      - libxcb1
+      - libx11-xcb1
+      - libxcb-render0
+      - libxcb-shm0
+      - libxcb-keysyms1
+      - libxcb-image0
+      - libxcb-icccm4
+      - libxcb-sync1
+      - libxcb-xfixes0
+      - libxcb-shape0
+      - libxcb-randr0
+      - libxcb-xinerama0
 
   files:
     include:
