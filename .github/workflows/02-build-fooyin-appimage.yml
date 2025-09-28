@@ -373,6 +373,13 @@ jobs:
           ls -la Fooyin-*.AppImage*
           echo "VERSION=${{ env.VERSION }}"
 
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fooyin-${{ env.VERSION }}-AppImage
+          path: |
+            Fooyin-*-x86_64.AppImage
+            Fooyin-*-x86_64.AppImage.zsync
 
       # --- СОХРАНЕНИЕ КЭША CCACHE ---
       - name: Save ccache
@@ -382,15 +389,6 @@ jobs:
         with:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
-
-
-      - name: Upload AppImage Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Fooyin-${{ env.VERSION }}-AppImage
-          path: |
-            Fooyin-*-x86_64.AppImage
-            Fooyin-*-x86_64.AppImage.zsync
 
       - name: Create GitHub Release
         if: ${{ success() }}
