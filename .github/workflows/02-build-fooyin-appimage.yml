@@ -184,13 +184,17 @@ jobs:
         with:
           python-version: '3.10'
       - run: |
-          sudo apt install -y binutils coreutils desktop-file-utils fakeroot fuse libgdk-pixbuf2.0-dev patchelf python3-pip python3-setuptools squashfs-tools strace util-linux zsync
+          sudo apt-get install -y 
+            binutils coreutils desktop-file-utils \
+            fakeroot fuse libgdk-pixbuf2.0-dev \
+            patchelf python3-pip python3-setuptools \
+            squashfs-tools strace util-linux zsync
           pip3 install --upgrade pip
           #sudo pip3 install appimage-builder
           pip3 index versions appimage-builder
           #pip3 install appimage-builder==0.8.2
           pip3 install appimage-builder==1.1.0
-          pip3 install --upgrade packaging setuptools
+          pip3 install packaging==25
           #appimage-builder --version
           python3.10 -m appimagebuilder --version
 
