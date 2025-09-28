@@ -369,7 +369,9 @@ jobs:
       
       # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB ---
       - name: Create GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        #if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        #if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        if: success()
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}-appimage
