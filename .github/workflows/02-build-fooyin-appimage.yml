@@ -320,28 +320,32 @@ jobs:
           ls -la "$INSTALL_PREFIX/share/applications/"
           echo " "
 
-      - name: Determine Version
-        id: get-version
+      # --- Определяем версию Fooyin и коммит ---
+      - name: Determine Fooyin Version and Commit
+        id: get_version
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
-          # Если мы на теге → берём его
-          VERSION=$(git describe --tags --exact-match 2>/dev/null || true)
 
-          if [ -z "$VERSION" ]; then
-            # Если тега нет → пробуем взять последний тег
-            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          # Пытаемся получить тег текущего коммита
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+
+          if [ -n "$TAG" ]; then
+            VERSION=${TAG#v}   # Убираем "v" если есть
+          else
+            # Если тега нет, используем короткий SHA
+            VERSION=${GITHUB_SHA::8}
           fi
 
-          if [ -z "$VERSION" ]; then
-            # Если и тегов нет → используем короткий SHA
-            VERSION=$(echo "${{ env.REF }}" | cut -c1-8)
-          fi
-
-          VERSION=${VERSION#v} # убираем 'v' если есть
+          # Коммит для Source Commit
+          COMMIT=$(git rev-parse --short HEAD)
 
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Resolved Fooyin version: $VERSION"
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+
+          echo "✅ Fooyin version: $VERSION"
+          echo "✅ Source commit: $COMMIT"
 
 
       - name: Build AppImage
@@ -367,27 +371,21 @@ jobs:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ hashFiles('**/.github/workflows/02-build-fooyin-appimage.yml') }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
       
-      # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB ---
+      # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB --- 
       - name: Create GitHub Release
-        #if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
-        #if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
         if: success()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ env.VERSION }}-appimage
+          tag_name: ${{ env.VERSION }}
           name: "Fooyin ${{ env.VERSION }} (AppImage)"
           body: |
             Automatic AppImage build for Fooyin ${{ env.VERSION }}
 
-            **Build Details:**
-            - **Fooyin Version:** ${{ env.VERSION }}
-            - **Qt Version:** ${{ env.QT_VERSION }} (Prebuilt)
-            - **FFmpeg Version:** ${{ env.FFMPEG_VERSION }}
-            - **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-            - **Source Commit:** [${{ env.REF }}](https://github.com/fooyin/fooyin/commit/${{ env.REF }})
+            **Includes:**
+            - Qt ${{ env.QT_VERSION }} (Prebuilt)
+            - FFmpeg ${{ env.FFMPEG_VERSION }}
 
-            This is an automated AppImage build.
+            Built from commit: https://github.com/fooyin/fooyin/commit/${{ env.COMMIT }}
           files: |
             Fooyin-*.AppImage
             Fooyin-*.AppImage.zsync
-          prerelease: ${{ contains(env.VERSION, '-') }}
