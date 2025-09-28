@@ -93,8 +93,10 @@ AppDir:
       - 'phrasebooks/'
       - 'mkspecs/'
 
+
   test:
-    skip: true
+    skip:  
+      all: true  
 
 AppImage:
   arch: x86_64
