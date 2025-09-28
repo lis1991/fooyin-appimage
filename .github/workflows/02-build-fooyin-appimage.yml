@@ -319,15 +319,7 @@ jobs:
           # Показываем статистику ccache после сборки
           echo "ccache stats after build:"
           ccache -s
-
-      # --- СОХРАНЕНИЕ КЭША CCACHE ---
-      - name: Save ccache
-        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/ccache
-          key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}      
+      
       
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
       - name: Prepare AppDir (Desktop file and icon)
@@ -375,6 +367,15 @@ jobs:
           appimage-builder --recipe recipe.yml --skip-test
           #appimage-builder --recipe recipe.yml --skip-test --build-arg VERSION=${{ env.VERSION }}
           
+
+      # --- СОХРАНЕНИЕ КЭША CCACHE ---
+      - name: Save ccache
+        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
 
       - name: Check AppImage files
         run: |
