@@ -339,6 +339,12 @@ jobs:
           appimage-builder --recipe recipe.yml --skip-test
           
 
+      - name: Get Fooyin version
+        id: fooyin_version
+        run: |
+          VERSION=$(grep -Po '(?<=project\(fooyin VERSION )[^)]*' $FOYIN_SOURCE_DIR/CMakeLists.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -356,12 +362,10 @@ jobs:
       
       # --- СОЗДАНИЕ РЕЛИЗА НА GITHUB ---
       - name: Create GitHub Release
-        # Создаем релиз только при запуске вручную или через workflow_call (например, из 03-watch-fooyin-releases.yml)
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
         uses: softprops/action-gh-release@v1
         with:
-          # Используем оригинальный тег из Fooyin, если это был тег, иначе используем нашу версию
-          tag_name: ${{ startsWith(github.event.inputs.fooyin_ref, 'v') && github.event.inputs.fooyin_ref || format('{0}-appimage', env.VERSION) }}
+          tag_name: v${{ env.VERSION }}-appimage
           name: "Fooyin ${{ env.VERSION }} (AppImage)"
           body: |
             Automatic AppImage build for Fooyin ${{ env.VERSION }}
@@ -374,5 +378,4 @@ jobs:
           files: |
             Fooyin-*.AppImage
             Fooyin-*.AppImage.zsync
-          prerelease: ${{ !startsWith(github.event.inputs.fooyin_ref, 'v') || contains(github.event.inputs.fooyin_ref, '-') }}
-          # fail_on_unmatched_files: true # Опционально, для строгой проверки
+          prerelease: ${{ contains(env.VERSION, '-') }}
