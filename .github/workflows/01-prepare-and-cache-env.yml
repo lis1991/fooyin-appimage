@@ -19,7 +19,7 @@ env:
   FFMPEG_VERSION: "7.1.2"
   # Директории
   BUILD_DIR: ${{ github.workspace }}/build_env
-  INSTALL_PREFIX: ${{ github.workspace }}/cached_install
+  INSTALL_PREFIX: ${{ github.workspace }}/AppDir
   # URL и Архивы Qt
   QT_BASE_URL: "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_680/qt6_680/qt.qt6.680.linux_gcc_64"
   # Список архивов (разделитель - пробел или новая строка)
