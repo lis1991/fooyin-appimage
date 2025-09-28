@@ -7,7 +7,7 @@ AppDir:
     id: org.fooyin.Fooyin
     name: Fooyin
     icon: fooyin
-    version: "@@VERSION@@"
+    version: !ENV ${VERSION}
     exec: bin/fooyin
     exec_args: $@
 
