@@ -65,8 +65,12 @@ jobs:
             #   REF="master" # fallback
             # fi
           fi
+          echo " "
           echo "REF=$REF" >> $GITHUB_ENV
+          echo "REF=$REF"
+          echo " "
           echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "ref=$REF"
 
       - name: Checkout Fooyin source
         uses: actions/checkout@v4
