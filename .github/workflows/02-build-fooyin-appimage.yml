@@ -302,6 +302,9 @@ jobs:
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/fooyin.desktop"
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.fooyin.desktop"
+          echo "сраные иконки и desktop"
+          cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/org.fooyin.Fooyin.png"
+          cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.Fooyin.desktop"
 
           # Создаем .desktop файл с помощью printf
           #printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
