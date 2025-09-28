@@ -179,7 +179,9 @@ jobs:
           
           echo "=====[ END DEBUG ]====="
 
-      - name: Set up Python and appimage-builder
+
+      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
+      - name: Install system dependencies for Fooyin build
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -189,7 +191,15 @@ jobs:
             binutils coreutils desktop-file-utils \
             fakeroot fuse libgdk-pixbuf2.0-dev \
             patchelf python3-pip python3-setuptools \
-            squashfs-tools strace util-linux zsync
+            squashfs-tools strace util-linux zsync \
+            libgl1-mesa-dev libglu1-mesa-dev \ 
+            mesa-common-dev freeglut3-dev \
+            build-essential cmake git pkg-config \
+            libxkbcommon-dev libvulkan-dev \
+            libgme-dev libarchive-dev \
+            libopenmpt-dev libpipewire-0.3-dev \
+            libsdl2-dev libsndfile1-dev \
+            libebur128-dev ccache
           pip3 install --upgrade pip
           #sudo pip3 install appimage-builder
           pip3 index versions appimage-builder
@@ -198,26 +208,6 @@ jobs:
           pip3 install packaging==21.3
           #appimage-builder --version
           python3.10 -m appimagebuilder --version
-
-      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
-      - name: Install system dependencies for Fooyin build (including OpenGL)
-        run: |
-          sudo apt-get update
-          # Устанавливаем зависимости, необходимые для работы Fooyin, CMake и Qt Gui/Widgets
-          sudo apt-get install -y \
-            libgl1-mesa-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev \
-            build-essential cmake git pkg-config \
-            libxkbcommon-dev \
-            libvulkan-dev \
-            libgme-dev \
-            libarchive-dev \
-            libopenmpt-dev \
-            libpipewire-0.3-dev \
-            libsdl2-dev \
-            libsndfile1-dev \
-            libebur128-dev \
-            ccache
-
             
       # --- ВОССТАНОВЛЕНИЕ КЭША CCACHE ---
       - name: Restore ccache
