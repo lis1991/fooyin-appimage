@@ -38,6 +38,7 @@ AppDir:
       - libdbus-1-3
       - libfreetype6
       - libfontconfig1
+      - libicu70
 
   files:
     include:
