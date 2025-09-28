@@ -296,6 +296,8 @@ jobs:
         run: |
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/share/applications/fooyin.desktop"
+          mkdir -p "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/"
+          mkdir -p "$INSTALL_PREFIX/usr/share/applications/"         
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/fooyin.desktop"
 
