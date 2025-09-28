@@ -180,7 +180,7 @@ jobs:
           echo "=====[ END DEBUG ]====="
 
 
-      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN (включая OpenGL) ---
+      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN ---
       - name: Install system dependencies for Fooyin build
         uses: actions/setup-python@v5
         with:
@@ -276,7 +276,9 @@ jobs:
           
           # --- УСТАНОВКА ---
           cmake --build . --parallel 1 --target install
-          
+          echo
+          find $INSTALL_PREFIX -name fooyin -type f
+          echo
           echo "Fooyin build/install completed."
           
           # Показываем статистику ccache после сборки
