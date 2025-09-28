@@ -324,11 +324,25 @@ jobs:
         id: get-version
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
-          # Пытаемся получить тег или используем короткий SHA
-          VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "${{ env.REF }}" | cut -c1-8)
-          VERSION=${VERSION#v} # Убираем 'v' в начале, если есть
+          # Если мы на теге → берём его
+          VERSION=$(git describe --tags --exact-match 2>/dev/null || true)
+
+          if [ -z "$VERSION" ]; then
+            # Если тега нет → пробуем взять последний тег
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          fi
+
+          if [ -z "$VERSION" ]; then
+            # Если и тегов нет → используем короткий SHA
+            VERSION=$(echo "${{ env.REF }}" | cut -c1-8)
+          fi
+
+          VERSION=${VERSION#v} # убираем 'v' если есть
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Resolved Fooyin version: $VERSION"
+
 
       - name: Build AppImage
         run: |
@@ -338,14 +352,6 @@ jobs:
           #sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
           appimage-builder --recipe recipe.yml --skip-test
           
-
-      - name: Get Fooyin version
-        run: |
-          cd $FOYIN_SOURCE_DIR
-          VERSION=$(git describe --tags --abbrev=0)
-          VERSION=${VERSION#v}   # убираем префикс "v"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
