@@ -1,4 +1,3 @@
-# .github/workflows/03-watch-fooyin-releases.yml
 name: 03. Watch Fooyin Releases
 
 on:
@@ -7,10 +6,9 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
-# --- Добавить это ---
 permissions:
-  actions: write # Для запуска других workflow
-  contents: read  # По-прежнему нужно для listReleases
+  actions: write
+  contents: read
 
 jobs:
   check-and-trigger:
@@ -35,17 +33,34 @@ jobs:
               core.setFailed('No releases found for fooyin/fooyin');
             }
 
-      - name: Check if release AppImage already exists (simplified check)
+      - name: Check if AppImage release already exists
         id: check-artifact
-        run: |
-          # Это упрощенная проверка. В реальности можно проверить
-          # существование релиза в *этом* репозитории с определенным тегом.
-          # Пока просто выводим информацию.
-          echo "Would check for existing AppImage for tag: ${{ steps.get-latest-release.outputs.tag_name }}"
-          echo "check_result=not_implemented" >> $GITHUB_OUTPUT
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = '${{ steps.get-latest-release.outputs.tag_name }}';
+            const expectedTag = `fooyin-${tagName}-appimage`;
+            core.info(`Checking for existing release with tag: ${expectedTag}`);
+
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: expectedTag
+              });
+              core.info(`Release ${expectedTag} already exists — skipping build.`);
+              core.setOutput('check_result', 'found');
+            } catch (error) {
+              if (error.status === 404) {
+                core.info(`Release ${expectedTag} not found — triggering build.`);
+                core.setOutput('check_result', 'not_found');
+              } else {
+                core.setFailed(`Unexpected error checking release: ${error.message}`);
+              }
+            }
 
       - name: Trigger AppImage build
-        if: steps.check-artifact.outputs.check_result != 'found'
+        if: steps.check-artifact.outputs.check_result == 'not_found'
         uses: actions/github-script@v7
         with:
           script: |
@@ -53,7 +68,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: '02-build-fooyin-appimage.yml',
-              ref: 'main', // Или ветка, где находится workflow
+              ref: 'main',
               inputs: {
                 fooyin_ref: '${{ steps.get-latest-release.outputs.tag_name }}'
               }

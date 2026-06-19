@@ -1,4 +1,3 @@
-# .github/workflows/02-build-fooyin-appimage.yml
 name: 02. Build Fooyin AppImage
 
 on:
@@ -16,20 +15,16 @@ on:
         required: true
   push:
     branches:
-      - main # Или ваша основная ветка
+      - main
   pull_request:
     branches:
       - main
 
-# Определяем версии как переменные верхнего уровня для использования в env
 env:
-  # Версии (должны совпадать с 01-prepare-and-cache-env.yml)
   QT_VERSION: "6.8.0"
   FFMPEG_VERSION: "7.1.2"
-  # Директории
   INSTALL_PREFIX: ${{ github.workspace }}/AppDir
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
-  # Ключ кэша (должен совпадать с 01-prepare-and-cache-env.yml)
   CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3"
 
 jobs:
@@ -49,15 +44,11 @@ jobs:
             REF="${{ github.event.inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             REF="master"
-          else 
+          else
             REF="master"
           fi
-          echo " "
           echo "REF=$REF" >> $GITHUB_ENV
-          echo "REF=$REF"
-          echo " "
           echo "ref=$REF" >> $GITHUB_OUTPUT
-          echo "ref=$REF"
 
       - name: Checkout Fooyin source
         uses: actions/checkout@v4
@@ -71,7 +62,6 @@ jobs:
           mkdir -p ${{ env.INSTALL_PREFIX }}
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
-        
 
       # --- ВОССТАНОВЛЕНИЕ КЭША СРЕДЫ ---
       - name: Restore cached build environment
@@ -80,7 +70,7 @@ jobs:
         with:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
-          fail-on-cache-miss: true # Критично: если кэш не найден, останавливаемся
+          fail-on-cache-miss: true
 
       - name: Verify restored environment
         run: |
@@ -99,63 +89,47 @@ jobs:
       - name: Debug Qt Cache Structure and Files
         run: |
           echo "=====[ DEBUG: Qt Cache Structure ]====="
-          
-          echo "--- Qt Installation Prefix ---"
           echo "INSTALL_PREFIX: ${{ env.INSTALL_PREFIX }}"
-          
-          echo "--- Checking if INSTALL_PREFIX exists ---"
+
           if [ -d "${{ env.INSTALL_PREFIX }}" ]; then
             echo "Directory exists."
           else
             echo "ERROR: INSTALL_PREFIX directory does NOT exist!"
           fi
-          
-          echo "--- Listing contents of INSTALL_PREFIX (top level) ---"
+
           ls -la "${{ env.INSTALL_PREFIX }}" | head -n 20
-          
-          echo "--- Checking bin directory ---"
+
           if [ -d "${{ env.INSTALL_PREFIX }}/bin" ]; then
             echo "bin/ exists. Contents (first 10):"
             ls -la "${{ env.INSTALL_PREFIX }}/bin" | head -n 10
-            echo "qmake exists?"
             ls -la "${{ env.INSTALL_PREFIX }}/bin/qmake" 2>/dev/null || echo "qmake NOT in bin/"
           else
             echo "bin/ directory does NOT exist!"
           fi
-          
-          echo "--- Checking lib directory ---"
+
           if [ -d "${{ env.INSTALL_PREFIX }}/lib" ]; then
             echo "lib/ exists. Size: $(du -sh ${{ env.INSTALL_PREFIX }}/lib | cut -f1)"
             echo "Number of .so files: $(find ${{ env.INSTALL_PREFIX }}/lib -name '*.so*' 2>/dev/null | wc -l)"
-            echo "Looking for Widgets library..."
             find ${{ env.INSTALL_PREFIX }}/lib -name "*Widget*" -type f 2>/dev/null || echo "No Widget .so files found directly in lib/"
           else
             echo "lib/ directory does NOT exist!"
           fi
-          
-          echo "--- Checking lib/cmake directory ---"
+
           if [ -d "${{ env.INSTALL_PREFIX }}/lib/cmake" ]; then
-            echo "lib/cmake/ exists. Contents:"
             ls -la "${{ env.INSTALL_PREFIX }}/lib/cmake/" | head -n 15
           else
             echo "lib/cmake/ directory does NOT exist!"
           fi
-          
-          echo "--- Detailed Qt6Widgets Check ---"
+
           WIDGETS_CMAKE_DIR="${{ env.INSTALL_PREFIX }}/lib/cmake/Qt6Widgets"
           if [ -d "$WIDGETS_CMAKE_DIR" ]; then
             echo "Qt6Widgets cmake directory EXISTS: $WIDGETS_CMAKE_DIR"
-            echo "Contents of Qt6Widgets cmake dir:"
             ls -la "$WIDGETS_CMAKE_DIR"
-            
-            echo "Checking for specific files:"
             declare -a files_to_check=("Qt6WidgetsConfig.cmake" "Qt6WidgetsDependencies.cmake")
             for file in "${files_to_check[@]}"; do
               if [ -f "$WIDGETS_CMAKE_DIR/$file" ]; then
                 echo "  [FOUND] $file"
-                # Show first few lines of the config file to see what it tries to include
                 if [[ "$file" == *"Config.cmake" ]]; then
-                  echo "    First 5 lines:"
                   head -n 5 "$WIDGETS_CMAKE_DIR/$file" | sed 's/^/      /'
                 fi
               else
@@ -164,18 +138,13 @@ jobs:
             done
           else
             echo "Qt6Widgets cmake directory DOES NOT EXIST: $WIDGETS_CMAKE_DIR"
-            echo "Searching for any Qt6Widgets* dirs in cmake..."
             find ${{ env.INSTALL_PREFIX }}/lib/cmake/ -name "Qt6Widgets*" -type d 2>/dev/null || echo "No Qt6Widgets directories found in cmake/"
           fi
-          
-          echo "--- Full Search for Qt6WidgetsDependencies.cmake ---"
-          echo "Searching entire cache prefix for Qt6WidgetsDependencies.cmake:"
+
           find ${{ env.INSTALL_PREFIX }} -name "Qt6WidgetsDependencies.cmake" 2>/dev/null || echo "Qt6WidgetsDependencies.cmake NOT FOUND anywhere in cache"
-          
           echo "=====[ END DEBUG ]====="
 
-
-      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOYIN ---
+      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOOYIN ---
       - name: Install system dependencies for Fooyin build
         uses: actions/setup-python@v5
         with:
@@ -196,23 +165,17 @@ jobs:
             libsdl2-dev libsndfile1-dev \
             libebur128-dev ccache libxcb-cursor0
           pip3 install --upgrade pip
-          #sudo pip3 install appimage-builder
           pip3 index versions appimage-builder
-          #pip3 install appimage-builder==0.8.2
           pip3 install appimage-builder==1.1.0
           pip3 install packaging==21.3
-          #appimage-builder --version
           python3.10 -m appimagebuilder --version
-            
+
       # --- ВОССТАНОВЛЕНИЕ КЭША CCACHE ---
       - name: Restore ccache
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/ccache
-          # Используем уникальный ключ, зависящий от хэша workflow файла и версий инструментов
-          # Это гарантирует, что кэш будет сброшен при изменении workflow или обновлении компиляторов
           key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
-          # restore-keys позволяют восстановить совместимый кэш, если точное совпадение не найдено
           restore-keys: |
             ccache-${{ runner.os }}-${{ env.QT_VERSION }}-
             ccache-${{ runner.os }}-
@@ -242,7 +205,6 @@ jobs:
               if (targetCache) {
                 const cacheId = targetCache.id;
                 console.log(`🗑️ Found ccache to delete. ID: ${cacheId}, Key: ${targetCache.key}, Size: ${targetCache.size} bytes`);
-                
                 await github.rest.actions.deleteActionsCacheById({
                   owner,
                   repo,
@@ -255,118 +217,83 @@ jobs:
             } catch (error) {
               console.error(`❌ Failed to delete ccache: ${error.message}`);
             }
-      
+
       - name: Setup ccache
         run: |
-          echo "Setting up ccache..."
-          # Создаем директорию для кэша ccache
           mkdir -p ${{ github.workspace }}/ccache
-          
-          # Настраиваем ccache через переменные окружения
           echo "CCACHE_DIR=${{ github.workspace }}/ccache" >> $GITHUB_ENV
           echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
-          # Установим мягкий лимит на размер кэша (например, 2 ГБ)
           echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
-          # Включаем сжатие кэша
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
-          # (Опционально) Включаем логирование для отладки
-          # echo "CCACHE_LOGFILE=${{ github.workspace }}/ccache.log" >> $GITHUB_ENV
-          
-          # Показываем начальную статистику (должна быть пустой)
           echo "Initial ccache stats:"
           ccache -s
-          
-          # НЕ НУЖНО устанавливать CC/CXX здесь для CMake.
-          # Вместо этого будем использовать флаги CMAKE при вызове cmake.
-          # echo "CC=ccache gcc" >> $GITHUB_ENV  # <-- Удалить
-          # echo "CXX=ccache g++" >> $GITHUB_ENV # <-- Удалить
-          
-          echo "ccache setup complete."
 
       # --- СБОРКА FOOYIN ---
       - name: Build Fooyin
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
-          #rm -rf build 
           mkdir -p build && cd build
           echo "Starting Fooyin build with ccache..."
-          
-          # Показываем статистику ccache перед сборкой
           echo "ccache stats before config/build:"
           ccache -s
-          
-          # --- КОНФИГУРАЦИЯ CMAKE с ccache launcher ---
+
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          
-          # --- СБОРКА ---
-          # Запускаем сборку с ограниченным параллелизмом, как обсуждалось ранее, чтобы снизить нагрузку на память
+
+          # Запускаем сборку с ограниченным параллелизмом для снижения нагрузки на память
           cmake --build . --parallel 1
-          
-          # --- УСТАНОВКА ---
           cmake --build . --parallel 1 --target install
-          echo " "
+
+          echo ""
           find $INSTALL_PREFIX -name fooyin -type f
-          echo " "
+          echo ""
           echo "Fooyin build/install completed."
-          echo " "
-          ls -la 
-          echo " "
-          # Показываем статистику ccache после сборки
+          echo ""
+          ls -la
+          echo ""
           echo "ccache stats after build:"
           ccache -s
-      
-      
+
       # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
       - name: Prepare AppDir (Desktop file and icon)
         run: |
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/share/applications/fooyin.desktop"
           mkdir -p "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/"
-          mkdir -p "$INSTALL_PREFIX/usr/share/applications/"         
+          mkdir -p "$INSTALL_PREFIX/usr/share/applications/"
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/fooyin.desktop"
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.fooyin.desktop"
-          echo "сраные иконки и desktop"
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/org.fooyin.Fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.Fooyin.desktop"
 
-          # Создаем .desktop файл с помощью printf
-          #printf "[Desktop Entry]\nVersion=1.0\nType=Application\nName=Fooyin\nComment=A customisable music player\nExec=fooyin %%F\nIcon=fooyin\nTerminal=false\nCategories=AudioVideo;Player;\nMimeType=application/x-ogg;audio/aac;audio/mp4;audio/mpeg;audio/ogg;audio/x-flac;audio/x-m4a;audio/x-mp3;audio/x-mpeg;audio/x-ms-wma;audio/x-vorbis;audio/x-vorbis+ogg;audio/x-wav;\nStartupNotify=true\n" > "${{ env.INSTALL_PREFIX }}/share/applications/fooyin.desktop"
-          
-          echo " "
-          echo "ls -la "$INSTALL_PREFIX/bin/""
+          echo ""
           ls -la "$INSTALL_PREFIX/bin/"
-          echo " "
-          echo "ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/""
+          echo ""
           ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"
-          echo " "
-          echo "ls -la "$INSTALL_PREFIX/share/applications/""
+          echo ""
           ls -la "$INSTALL_PREFIX/share/applications/"
-          echo " "
+          echo ""
 
-      # --- Определяем версию Fooyin и коммит ---
+      # --- Определяем версию Fooyin ---
       - name: Set Version from REF
         id: set-version
         run: |
-          # Используем REF как версию
           VERSION="${{ env.REF }}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Using REF as version: $VERSION"
 
-
       - name: Build AppImage
         run: |
           export VERSION=${{ env.VERSION }}
           appimage-builder --recipe recipe.yml --skip-test
-          #appimage-builder --recipe recipe.yml --skip-test --build-arg VERSION=${{ env.VERSION }}
-          
+
       - name: Check AppImage files
         run: |
           echo "📦 Generated AppImage files:"
@@ -383,7 +310,6 @@ jobs:
 
       # --- СОХРАНЕНИЕ КЭША CCACHE ---
       - name: Save ccache
-        # Выполняем всегда, даже если сборка упала, чтобы сохранить прогресс
         if: always()
         uses: actions/cache/save@v4
         with:
@@ -392,7 +318,7 @@ jobs:
 
       - name: Create GitHub Release
         if: ${{ success() }}
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: fooyin-${{ env.VERSION }}-appimage
           name: "Fooyin ${{ env.VERSION }} (AppImage)"
