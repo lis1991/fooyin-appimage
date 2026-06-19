@@ -86,63 +86,17 @@ jobs:
             echo "Warning: FFmpeg libraries not found in cache."
           fi
 
-      - name: Debug Qt Cache Structure and Files
+      # --- УСТАНОВКА GCC-13 (требуется для C++23 std::expected) ---
+      - name: Install GCC-13
         run: |
-          echo "=====[ DEBUG: Qt Cache Structure ]====="
-          echo "INSTALL_PREFIX: ${{ env.INSTALL_PREFIX }}"
-
-          if [ -d "${{ env.INSTALL_PREFIX }}" ]; then
-            echo "Directory exists."
-          else
-            echo "ERROR: INSTALL_PREFIX directory does NOT exist!"
-          fi
-
-          ls -la "${{ env.INSTALL_PREFIX }}" | head -n 20
-
-          if [ -d "${{ env.INSTALL_PREFIX }}/bin" ]; then
-            echo "bin/ exists. Contents (first 10):"
-            ls -la "${{ env.INSTALL_PREFIX }}/bin" | head -n 10
-            ls -la "${{ env.INSTALL_PREFIX }}/bin/qmake" 2>/dev/null || echo "qmake NOT in bin/"
-          else
-            echo "bin/ directory does NOT exist!"
-          fi
-
-          if [ -d "${{ env.INSTALL_PREFIX }}/lib" ]; then
-            echo "lib/ exists. Size: $(du -sh ${{ env.INSTALL_PREFIX }}/lib | cut -f1)"
-            echo "Number of .so files: $(find ${{ env.INSTALL_PREFIX }}/lib -name '*.so*' 2>/dev/null | wc -l)"
-            find ${{ env.INSTALL_PREFIX }}/lib -name "*Widget*" -type f 2>/dev/null || echo "No Widget .so files found directly in lib/"
-          else
-            echo "lib/ directory does NOT exist!"
-          fi
-
-          if [ -d "${{ env.INSTALL_PREFIX }}/lib/cmake" ]; then
-            ls -la "${{ env.INSTALL_PREFIX }}/lib/cmake/" | head -n 15
-          else
-            echo "lib/cmake/ directory does NOT exist!"
-          fi
-
-          WIDGETS_CMAKE_DIR="${{ env.INSTALL_PREFIX }}/lib/cmake/Qt6Widgets"
-          if [ -d "$WIDGETS_CMAKE_DIR" ]; then
-            echo "Qt6Widgets cmake directory EXISTS: $WIDGETS_CMAKE_DIR"
-            ls -la "$WIDGETS_CMAKE_DIR"
-            declare -a files_to_check=("Qt6WidgetsConfig.cmake" "Qt6WidgetsDependencies.cmake")
-            for file in "${files_to_check[@]}"; do
-              if [ -f "$WIDGETS_CMAKE_DIR/$file" ]; then
-                echo "  [FOUND] $file"
-                if [[ "$file" == *"Config.cmake" ]]; then
-                  head -n 5 "$WIDGETS_CMAKE_DIR/$file" | sed 's/^/      /'
-                fi
-              else
-                echo "  [MISSING] $file"
-              fi
-            done
-          else
-            echo "Qt6Widgets cmake directory DOES NOT EXIST: $WIDGETS_CMAKE_DIR"
-            find ${{ env.INSTALL_PREFIX }}/lib/cmake/ -name "Qt6Widgets*" -type d 2>/dev/null || echo "No Qt6Widgets directories found in cmake/"
-          fi
-
-          find ${{ env.INSTALL_PREFIX }} -name "Qt6WidgetsDependencies.cmake" 2>/dev/null || echo "Qt6WidgetsDependencies.cmake NOT FOUND anywhere in cache"
-          echo "=====[ END DEBUG ]====="
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          sudo update-alternatives --set gcc /usr/bin/gcc-13
+          sudo update-alternatives --set g++ /usr/bin/g++-13
+          gcc --version
+          g++ --version
 
       # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOOYIN ---
       - name: Install system dependencies for Fooyin build
@@ -150,7 +104,6 @@ jobs:
         with:
           python-version: '3.10'
       - run: |
-          sudo apt-get update
           sudo apt-get install -y \
             binutils coreutils desktop-file-utils \
             fakeroot fuse libgdk-pixbuf2.0-dev \
@@ -241,6 +194,8 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_PREFIX_PATH=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-13 \
+            -DCMAKE_CXX_COMPILER=g++-13 \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
