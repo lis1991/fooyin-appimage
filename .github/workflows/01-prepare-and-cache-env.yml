@@ -33,7 +33,7 @@ env:
     6.8.0-0-202410030750qtdeclarative-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
     6.8.0-0-202410030750meta.7z
   # Ключ кэша (обновите версию при изменении конфигурации)
-  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3" 
+  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v4"
 
 jobs:
   prepare:
@@ -46,9 +46,8 @@ jobs:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
 
-      # --- УДАЛЕНИЕ СУЩЕСТВУЮЩЕГО КЭША (альтернатива actions/cache/restore) ---
+      # --- УДАЛЕНИЕ СУЩЕСТВУЮЩЕГО КЭША ---
       - name: Delete Existing Cache (if found)
-        # Используем github-script для работы с API
         uses: actions/github-script@v7
         with:
           script: |
@@ -59,130 +58,143 @@ jobs:
             console.log(`Searching for cache with key: ${cacheKey}`);
 
             try {
-              // Список кэшей возвращается постранично. Для простоты проверим первую страницу.
-              // Для очень активных репозиториев может потребоваться итерация.
               const response = await github.rest.actions.getActionsCacheList({
                 owner,
                 repo,
-                per_page: 100 // Максимальное значение на странице
+                per_page: 100
               });
 
               const caches = response.data.actions_caches;
               console.log(`Found ${caches.length} cache entries.`);
 
-              // Найти кэш с совпадающим ключом
               const targetCache = caches.find(cache => cache.key === cacheKey);
 
               if (targetCache) {
                 const cacheId = targetCache.id;
                 console.log(`Found cache to delete. ID: ${cacheId}, Key: ${targetCache.key}`);
-                
-                // Попытка удаления
                 await github.rest.actions.deleteActionsCacheById({
                   owner,
                   repo,
                   cache_id: cacheId
                 });
                 console.log(`Successfully deleted cache ID ${cacheId}.`);
-                
-                // Опционально: небольшая задержка, чтобы убедиться, что кэш удален серверно
-                // await new Promise(resolve => setTimeout(resolve, 5000)); 
-                
               } else {
                 console.log(`Cache with key '${cacheKey}' not found.`);
               }
             } catch (error) {
               console.error(`Failed to search or delete cache: ${error.message}`);
-              // В зависимости от требований, можно завершить workflow или продолжить
-              // core.setFailed(`Cache deletion failed: ${error.message}`);
             }
-      
+
       - name: Setup directories
-        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         run: |
           mkdir -p ${{ env.BUILD_DIR }}
           mkdir -p ${{ env.INSTALL_PREFIX }}
 
-      - name: Install tools
-        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
+      # --- УСТАНОВКА ИНСТРУМЕНТОВ И ВСЕХ ЗАВИСИМОСТЕЙ ---
+      # Требуется GCC 13 для поддержки C++23 (fooyin требует C++23)
+      # Устанавливаем ВСЕ обязательные и опциональные зависимости из BUILD.md
+      - name: Install tools and all dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full wget build-essential yasm nasm curl libutfcpp-dev
+
+          # Добавляем toolchain PPA для GCC 13 (Ubuntu 22.04 имеет GCC 11 по умолчанию)
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            gcc-13 g++-13 \
+            p7zip-full wget curl build-essential yasm nasm \
+            cmake ninja-build pkg-config git \
+            \
+            `# --- Обязательные системные зависимости (BUILD.md) ---` \
+            zlib1g-dev \
+            libicu-dev \
+            libxkbcommon-dev \
+            libglu1-mesa-dev \
+            \
+            `# --- Audio output: ALSA + PipeWire + SDL2 (нужно хотя бы одно) ---` \
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libsdl2-dev \
+            \
+            `# --- Опциональные плагины (BUILD.md: Optional libraries) ---` \
+            libsndfile1-dev \
+            libopenmpt-dev \
+            libgme-dev \
+            libarchive-dev \
+            libebur128-dev \
+            libsoundtouch-dev \
+            libsoxr-dev \
+            \
+            `# --- Утилиты для сборки ---` \
+            libutfcpp-dev
+
+          # Устанавливаем GCC 13 по умолчанию
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          sudo update-alternatives --set gcc /usr/bin/gcc-13
+          sudo update-alternatives --set g++ /usr/bin/g++-13
+
+          echo "✅ GCC version:"
+          gcc --version
+          g++ --version
 
       # --- СКАЧИВАНИЕ И УСТАНОВКА ПРЕДКОМПИЛИРОВАННОГО QT ---
       - name: Download and Install Prebuilt Qt
-        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting Qt download and installation..."
-          
-          # Преобразуем переменную окружения в массив Bash
-          # Это позволяет корректно итерироваться по каждому архиву
+
           IFS=' ' read -r -a archives <<< "${{ env.QT_ARCHIVES }}"
-          
-          # Итерируем по массиву
+
           for archive in "${archives[@]}"; do
-            # Пропускаем пустые строки (на случай лишних пробелов)
-            if [ -z "$archive" ]; then 
+            if [ -z "$archive" ]; then
               echo "Skipping empty archive entry."
               continue
             fi
-            
+
             echo "Downloading $archive..."
-            # ВАЖНО: Нет лишних пробелов в строке URL
             wget -q "${{ env.QT_BASE_URL }}/$archive"
-            
-            # Опционально: Проверка контрольной суммы (используя .sha1 файл)
-            # echo "Downloading SHA1 for $archive..."
-            # wget -q "${{ env.QT_BASE_URL }}/$archive.sha1"
-            # echo "Verifying $archive..."
-            # sha1sum -c "$archive.sha1" || { echo "SHA1 verification failed for $archive"; exit 1; }
-            
+
             echo "Extracting $archive..."
             7z x "$archive"
-            
-            # Очистка архива после распаковки для экономии места
-            rm -f "$archive" # "$archive.sha1"
+
+            rm -f "$archive"
           done
-          
-          # После распаковки все файлы обычно находятся в подкаталоге, например, 6.8.0/gcc_64/
-          # Находим этот каталог и копируем его содержимое в INSTALL_PREFIX
+
           QT_SOURCE_DIR=$(find . -maxdepth 2 -type d -name "gcc_64" | head -n 1)
-          
+
           if [ -z "$QT_SOURCE_DIR" ] || [ ! -d "$QT_SOURCE_DIR" ]; then
               echo "Error: Could not find 'gcc_64' directory after extraction."
-              echo "Contents of build directory:"
               ls -la
               find . -type d -name "*" | head -n 20
               exit 1
           fi
-          
+
           echo "Found Qt source directory: $QT_SOURCE_DIR"
           echo "Copying Qt files to ${{ env.INSTALL_PREFIX }}..."
           mkdir -p ${{ env.INSTALL_PREFIX }}
           cp -r "$QT_SOURCE_DIR"/* ${{ env.INSTALL_PREFIX }}/
-          
-          # Делаем qmake исполняемым, если он существует
+
           if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
               chmod +x ${{ env.INSTALL_PREFIX }}/bin/qmake
               echo "Made qmake executable."
           else
               echo "Warning: qmake not found in ${{ env.INSTALL_PREFIX }}/bin/ after copying."
           fi
-          
-          # Проверяем установку
+
           echo "Qt installation check:"
           if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
               ${{ env.INSTALL_PREFIX }}/bin/qmake -v
           else
               echo "Warning: qmake binary not present after installation steps."
           fi
-          
+
           echo "Qt installation process finished."
 
       # --- СБОРКА FFMPEG ---
       - name: Build and install FFmpeg
-        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting FFmpeg build..."
@@ -201,131 +213,98 @@ jobs:
             --enable-shared \
             --disable-static \
             --disable-doc \
-            --enable-pic
+            --enable-pic \
+            --cc=gcc-13 \
+            --cxx=g++-13
           echo "Building FFmpeg..."
           make -j$(nproc)
           echo "Installing FFmpeg..."
           make install
           echo "FFmpeg build and install completed."
 
-
       # --- СБОРКА TAGLIB ---
       - name: Download, Build and Install TagLib
-        # if: steps.cache-check.outputs.cache-hit != 'true' || github.event.inputs.force_rebuild == 'true'
         run: |
           echo "Starting TagLib download, build and install process..."
-          
+
           cd ${{ env.BUILD_DIR }}
-          
-          # 1. Определение последнего релиза TagLib
+
           echo "Fetching latest TagLib release info from GitHub..."
-          # Используем GitHub API для получения последнего релиза
           LATEST_RELEASE_JSON=$(curl -s https://api.github.com/repos/taglib/taglib/releases/latest)
-          
-          # Извлекаем URL архива исходного кода (.tar.gz)
+
           TAGLIB_TAR_GZ_URL=$(echo "$LATEST_RELEASE_JSON" | jq -r '.tarball_url')
-          # Извлекаем версию (tag name)
           TAGLIB_VERSION=$(echo "$LATEST_RELEASE_JSON" | jq -r '.tag_name')
-          
+
           if [ -z "$TAGLIB_TAR_GZ_URL" ] || [ "$TAGLIB_TAR_GZ_URL" == "null" ]; then
             echo "Error: Could not determine TagLib download URL from GitHub API response."
             echo "Response snippet: $(echo "$LATEST_RELEASE_JSON" | head -n 5)"
             exit 1
           fi
-          
+
           if [ -z "$TAGLIB_VERSION" ] || [ "$TAGLIB_VERSION" == "null" ]; then
             echo "Warning: Could not determine TagLib version from GitHub API response. Using 'latest'."
             TAGLIB_VERSION="latest"
           fi
-          
+
           echo "Latest TagLib release identified: $TAGLIB_VERSION"
           echo "Download URL: $TAGLIB_TAR_GZ_URL"
-          
-          # 2. Скачивание архива
+
           echo "Downloading TagLib $TAGLIB_VERSION source code..."
           wget -O taglib-$TAGLIB_VERSION.tar.gz "$TAGLIB_TAR_GZ_URL"
-          
-          # 3. Распаковка
+
           echo "Extracting TagLib source code..."
           tar -xzf taglib-$TAGLIB_VERSION.tar.gz
-          
-          # Найдем имя распакованной директории (оно может быть вроде taglib-taglib-<hash>)
+
           TAGLIB_SOURCE_DIR=$(find . -maxdepth 1 -type d -name "taglib-*" | grep -v "\.tar\.gz" | head -n 1)
-          
+
           if [ -z "$TAGLIB_SOURCE_DIR" ] || [ ! -d "$TAGLIB_SOURCE_DIR" ]; then
             echo "Error: Could not find extracted TagLib source directory."
-            echo "Contents of build directory:"
             ls -la
             exit 1
           fi
-          
+
           echo "TagLib source directory found: $TAGLIB_SOURCE_DIR"
-          
-          # 4. Переход в директорию сборки
+
           cd "$TAGLIB_SOURCE_DIR"
           mkdir -p build && cd build
 
-
-          
-
-          # Проверим, существует ли .gitmodules или упоминание utf8cpp в CMakeLists.txt
-          if grep -q "utf8cpp" "$TAGLIB_SOURCE_DIR/CMakeLists.txt" || [ -f "$TAGLIB_SOURCE_DIR/.gitmodules" ]; then
+          if grep -q "utf8cpp" "${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/CMakeLists.txt" || [ -f "${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/.gitmodules" ]; then
               echo "Detected potential need for utf8cpp based on CMakeLists.txt or .gitmodules."
-              # Создаем директорию для submodule
-              mkdir -p "$TAGLIB_SOURCE_DIR/3rdparty"
-              cd "$TAGLIB_SOURCE_DIR/3rdparty"
-              
-              # Скачиваем содержимое utf8cpp submodule
-              # Используем последний коммит из основной ветки репозитория nemtrif/utf8cpp на момент анализа
-              # Можно заменить на конкретный коммит, если нужно.
-              UTF8CPP_COMMIT="master" # Или конкретный хэш коммита, например: "a1b2c3d4e5f6..."
+              mkdir -p "${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/3rdparty"
+              cd "${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/3rdparty"
+
+              UTF8CPP_COMMIT="master"
               echo "Downloading utf8cpp submodule ($UTF8CPP_COMMIT)..."
               wget -qO- "https://github.com/nemtrif/utf8cpp/archive/$UTF8CPP_COMMIT.tar.gz" | tar xz
-              
-              # Переименовываем распакованную директорию в utf8cpp
+
               UTF8CPP_EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "utf8cpp-*" | head -n 1)
               if [ -n "$UTF8CPP_EXTRACTED_DIR" ] && [ -d "$UTF8CPP_EXTRACTED_DIR" ]; then
                   mv "$UTF8CPP_EXTRACTED_DIR" utf8cpp
-                  echo "utf8cpp submodule placed into $TAGLIB_SOURCE_DIR/3rdparty/utf8cpp"
-                  
-                  # Проверим, есть ли там CMakeLists.txt или include
-                  if [ -f "utf8cpp/CMakeLists.txt" ] || [ -d "utf8cpp/source" ]; then
-                      echo "utf8cpp content verified."
-                  else
-                      echo "Warning: utf8cpp content might be unexpected. Check structure."
-                  fi
+                  echo "utf8cpp submodule placed into ${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/3rdparty/utf8cpp"
               else
                   echo "Error: Failed to extract or find utf8cpp directory."
                   ls -la
                   exit 1
               fi
-              # Вернемся в директорию сборки TagLib
-              cd "$TAGLIB_SOURCE_DIR/build"
+              cd "${{ env.BUILD_DIR }}/$TAGLIB_SOURCE_DIR/build"
           else
               echo "utf8cpp not detected as a dependency in TagLib source. Skipping manual submodule setup."
           fi
 
-
-
-          
-
-          
-          # 5. Конфигурация CMake
           echo "Configuring TagLib build with CMake..."
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON # Fooyin обычно использует разделяемые библиотеки
-            
-          # 6. Сборка
+            -DCMAKE_C_COMPILER=gcc-13 \
+            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DBUILD_SHARED_LIBS=ON
+
           echo "Building TagLib..."
           make -j$(nproc)
-          
-          # 7. Установка
+
           echo "Installing TagLib to ${{ env.INSTALL_PREFIX }}..."
           make install
-          
-          # 8. Проверка установки (опционально)
+
           echo "TagLib build and install process completed."
           echo "Checking for installed library..."
           if [ -f "${{ env.INSTALL_PREFIX }}/lib/libtag.so" ] || [ -f "${{ env.INSTALL_PREFIX }}/lib/libtag.so.1" ]; then
@@ -333,30 +312,16 @@ jobs:
           else
             echo "Warning: TagLib library (.so) not found in ${{ env.INSTALL_PREFIX }}/lib/ after installation."
           fi
-          
-          # 9. Очистка (опционально, для экономии места в кэше)
+
           echo "Cleaning up build directory..."
           cd ${{ env.BUILD_DIR }}
           rm -rf taglib-$TAGLIB_VERSION.tar.gz "$TAGLIB_SOURCE_DIR"
-          
-          echo "TagLib processing finished."
 
+          echo "TagLib processing finished."
 
       # --- СОХРАНЕНИЕ КЭША ---
       - name: Save build environment to cache
-        #if: steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true
         uses: actions/cache/save@v4
         with:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
-
-      #- name: Report Cache Status
-        #run: |
-          #if [[ "${{ steps.cache-check.outputs.cache-hit }}" == "true" && "${{ inputs.force_rebuild }}" != "true" ]]; then
-            #echo "✅ Using existing cached environment."
-          #elif [[ "${{ inputs.force_rebuild }}" == "true" ]]; then
-            #echo "🔄 Forced rebuild completed and cache updated."
-          #else
-            #echo "🆕 New environment built and cached."
-          #fi
-          #echo "Cache key used: ${{ env.CACHE_KEY }}"
