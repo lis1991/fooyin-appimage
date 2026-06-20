@@ -13,9 +13,10 @@ AppDir:
 
   runtime:
     env:
-      LD_LIBRARY_PATH: usr/local/lib:usr/local/lib/x86_64-linux-gnu:usr/lib/x86_64-linux-gnu:lib:lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
-      QT_PLUGIN_PATH: usr/local/lib/qt6/plugins:usr/local/lib/x86_64-linux-gnu/qt6/plugins:lib/qt6/plugins:lib/x86_64-linux-gnu/qt6/plugins
-      QML2_IMPORT_PATH: usr/local/lib/qt6/qml:usr/local/lib/x86_64-linux-gnu/qt6/qml:lib/qt6/qml:lib/x86_64-linux-gnu/qt6/qml
+      # ИСПРАВЛЕНО: добавлены пути к корневому lib/ (FFmpeg, TagLib устанавливаются в INSTALL_PREFIX напрямую)
+      LD_LIBRARY_PATH: lib:lib/x86_64-linux-gnu:usr/local/lib:usr/local/lib/x86_64-linux-gnu:usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+      QT_PLUGIN_PATH: lib/qt6/plugins:lib/x86_64-linux-gnu/qt6/plugins:usr/local/lib/qt6/plugins:usr/local/lib/x86_64-linux-gnu/qt6/plugins
+      QML2_IMPORT_PATH: lib/qt6/qml:lib/x86_64-linux-gnu/qt6/qml:usr/local/lib/qt6/qml:usr/local/lib/x86_64-linux-gnu/qt6/qml
 
   apt:
     arch: amd64
@@ -82,6 +83,10 @@ AppDir:
       - lib/libav*.so.*
       - lib/libsw*.so.*
 
+      # TagLib
+      - lib/libtag*.so.*
+      - usr/local/lib/libtag*.so.*
+
       # ICU 76
       - usr/local/lib/libicu*.so.*
       - lib/libicu*.so.*
@@ -103,5 +108,6 @@ AppDir:
 
 AppImage:
   arch: x86_64
-  update-information: "gh-releases-zsync|fooyin/fooyin|latest|Fooyin-*-x86_64.AppImage.zsync"
+  # ИСПРАВЛЕНО: update-information указывает на lis1991/fooyin-appimage, а не fooyin/fooyin
+  update-information: "gh-releases-zsync|lis1991|fooyin-appimage|latest|Fooyin-*-x86_64.AppImage.zsync"
   sign-key: none

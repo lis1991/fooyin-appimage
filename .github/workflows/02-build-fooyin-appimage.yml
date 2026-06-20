@@ -25,7 +25,8 @@ env:
   FFMPEG_VERSION: "7.1.2"
   INSTALL_PREFIX: ${{ github.workspace }}/AppDir
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
-  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v3"
+  # ИСПРАВЛЕНО: CACHE_KEY синхронизирован с воркфлоу 01 (v3 → v4)
+  CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v4"
 
 jobs:
   build:
@@ -38,10 +39,11 @@ jobs:
       - name: Determine Fooyin ref
         id: determine-ref
         run: |
+          # ИСПРАВЛЕНО: workflow_call использует inputs.fooyin_ref, не github.event.inputs
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            REF="${{ github.event.inputs.fooyin_ref }}"
+            REF="${{ inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "workflow_call" ]]; then
-            REF="${{ github.event.inputs.fooyin_ref }}"
+            REF="${{ inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             REF="master"
           else
@@ -135,44 +137,6 @@ jobs:
             ccache-${{ runner.os }}-${{ env.QT_VERSION }}-
             ccache-${{ runner.os }}-
 
-      - name: Delete ccache cache
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const cacheKey = 'ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}';
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            console.log(`🔍 Searching for ccache with key: ${cacheKey}`);
-
-            try {
-              const response = await github.rest.actions.getActionsCacheList({
-                owner,
-                repo,
-                per_page: 100
-              });
-
-              const caches = response.data.actions_caches;
-              console.log(`📦 Found ${caches.length} cache entries total`);
-
-              const targetCache = caches.find(cache => cache.key === cacheKey);
-
-              if (targetCache) {
-                const cacheId = targetCache.id;
-                console.log(`🗑️ Found ccache to delete. ID: ${cacheId}, Key: ${targetCache.key}, Size: ${targetCache.size} bytes`);
-                await github.rest.actions.deleteActionsCacheById({
-                  owner,
-                  repo,
-                  cache_id: cacheId
-                });
-                console.log(`✅ Successfully deleted ccache ID ${cacheId}`);
-              } else {
-                console.log(`ℹ️ ccache with key '${cacheKey}' not found.`);
-              }
-            } catch (error) {
-              console.error(`❌ Failed to delete ccache: ${error.message}`);
-            }
-
       - name: Setup ccache
         run: |
           mkdir -p ${{ github.workspace }}/ccache
@@ -201,8 +165,9 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-          cmake --build . --parallel 1
-          cmake --build . --parallel 1 --target install
+          # ИСПРАВЛЕНО: --parallel 1 → $(nproc) для параллельной сборки
+          cmake --build . --parallel $(nproc)
+          cmake --build . --parallel $(nproc) --target install
 
           echo ""
           find $INSTALL_PREFIX -name fooyin -type f
@@ -271,6 +236,50 @@ jobs:
         with:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
+
+      # ИСПРАВЛЕНО: Удаление ccache перенесено ПОСЛЕ сохранения (было до сборки)
+      - name: Delete ccache cache (rotate for next run)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const cacheKey = 'ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            console.log(`🔍 Searching for old ccache with key: ${cacheKey}`);
+
+            try {
+              const response = await github.rest.actions.getActionsCacheList({
+                owner,
+                repo,
+                per_page: 100
+              });
+
+              const caches = response.data.actions_caches;
+              console.log(`📦 Found ${caches.length} cache entries total`);
+
+              // Удаляем все записи с этим ключом кроме самой свежей (только что сохранённой)
+              const matchingCaches = caches
+                .filter(cache => cache.key === cacheKey)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              for (const cache of matchingCaches.slice(1)) {
+                console.log(`🗑️ Deleting old ccache ID: ${cache.id}`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner,
+                  repo,
+                  cache_id: cache.id
+                });
+                console.log(`✅ Deleted ccache ID ${cache.id}`);
+              }
+
+              if (matchingCaches.length <= 1) {
+                console.log(`ℹ️ Only one or zero entries — nothing to rotate.`);
+              }
+            } catch (error) {
+              console.error(`❌ Failed to rotate ccache: ${error.message}`);
+            }
 
       - name: Create GitHub Release
         if: ${{ success() }}

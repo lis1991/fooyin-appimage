@@ -1,4 +1,3 @@
-# .github/workflows/01-prepare-and-cache-env.yml
 name: 01. Prepare & Cache Build Environment
 
 on:
@@ -45,9 +44,11 @@ jobs:
         with:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
+          lookup-only: true
 
-      # --- УДАЛЕНИЕ СУЩЕСТВУЮЩЕГО КЭША ---
+      # --- УДАЛЕНИЕ СУЩЕСТВУЮЩЕГО КЭША (только при force_rebuild или если кэш уже есть) ---
       - name: Delete Existing Cache (if found)
+        if: ${{ inputs.force_rebuild == true || steps.cache-check.outputs.cache-hit == 'true' }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -85,7 +86,15 @@ jobs:
               console.error(`Failed to search or delete cache: ${error.message}`);
             }
 
+      # --- ПРОПУСКАЕМ ДАЛЬНЕЙШИЕ ШАГИ ЕСЛИ КЭШ УЖЕ ЕСТЬ И force_rebuild НЕ ЗАДАН ---
+      - name: Skip build if cache is fresh
+        if: ${{ steps.cache-check.outputs.cache-hit == 'true' && inputs.force_rebuild != true }}
+        run: |
+          echo "✅ Cache already exists and force_rebuild is not set. Skipping build."
+          exit 0
+
       - name: Setup directories
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         run: |
           mkdir -p ${{ env.BUILD_DIR }}
           mkdir -p ${{ env.INSTALL_PREFIX }}
@@ -94,6 +103,7 @@ jobs:
       # Требуется GCC 13 для поддержки C++23 (fooyin требует C++23)
       # Устанавливаем ВСЕ обязательные и опциональные зависимости из BUILD.md
       - name: Install tools and all dependencies
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         run: |
           sudo apt-get update
 
@@ -142,6 +152,7 @@ jobs:
 
       # --- СКАЧИВАНИЕ И УСТАНОВКА ПРЕДКОМПИЛИРОВАННОГО QT ---
       - name: Download and Install Prebuilt Qt
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting Qt download and installation..."
@@ -195,6 +206,7 @@ jobs:
 
       # --- СБОРКА FFMPEG ---
       - name: Build and install FFmpeg
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "Starting FFmpeg build..."
@@ -224,6 +236,7 @@ jobs:
 
       # --- СБОРКА TAGLIB ---
       - name: Download, Build and Install TagLib
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         run: |
           echo "Starting TagLib download, build and install process..."
 
@@ -321,6 +334,7 @@ jobs:
 
       # --- СОХРАНЕНИЕ КЭША ---
       - name: Save build environment to cache
+        if: ${{ steps.cache-check.outputs.cache-hit != 'true' || inputs.force_rebuild == true }}
         uses: actions/cache/save@v4
         with:
           path: ${{ env.INSTALL_PREFIX }}
