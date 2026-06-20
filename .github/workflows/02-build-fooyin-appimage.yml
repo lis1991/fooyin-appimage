@@ -25,13 +25,23 @@ env:
   FFMPEG_VERSION: "7.1.2"
   INSTALL_PREFIX: ${{ github.workspace }}/AppDir
   FOYIN_SOURCE_DIR: ${{ github.workspace }}/fooyin
-  # ИСПРАВЛЕНО: CACHE_KEY синхронизирован с воркфлоу 01 (v3 → v4)
+  BUILD_DIR: ${{ github.workspace }}/build_env
   CACHE_KEY: "build-env-qt6.8.0-ffmpeg7.1.2-v4"
+  QT_BASE_URL: "https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/qt6_680/qt6_680/qt.qt6.680.linux_gcc_64"
+  QT_ARCHIVES: >
+    6.8.0-0-202410030750icu-linux-Rhel8.6-x86_64.7z
+    6.8.0-0-202410030750qtbase-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qtsvg-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qtwayland-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qttranslations-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qttools-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750qtdeclarative-Linux-RHEL_8_8-GCC-Linux-RHEL_8_8-X86_64.7z
+    6.8.0-0-202410030750meta.7z
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout this repo (for recipe.yml)
         uses: actions/checkout@v4
@@ -39,8 +49,6 @@ jobs:
       - name: Determine Fooyin ref
         id: determine-ref
         run: |
-          # ИСПРАВЛЕНО: и workflow_dispatch, и workflow_call используют inputs.fooyin_ref
-          # (github.event.inputs работает только для workflow_dispatch, не для workflow_call)
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             REF="${{ inputs.fooyin_ref }}"
           elif [[ "${{ github.event_name }}" == "workflow_call" ]]; then
@@ -60,36 +68,139 @@ jobs:
           ref: ${{ env.REF }}
           path: ${{ env.FOYIN_SOURCE_DIR }}
 
-      - name: Setup AppDir structure
+      - name: Setup directories
         run: |
+          mkdir -p ${{ env.BUILD_DIR }}
           mkdir -p ${{ env.INSTALL_PREFIX }}
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/applications
           mkdir -p ${{ env.INSTALL_PREFIX }}/share/icons/hicolor/256x256/apps
 
-      # --- ВОССТАНОВЛЕНИЕ КЭША СРЕДЫ ---
+      # --- ВОССТАНОВЛЕНИЕ КЭША СРЕДЫ (без fail-on-cache-miss) ---
       - name: Restore cached build environment
         uses: actions/cache/restore@v4
         id: restore-env
         with:
           path: ${{ env.INSTALL_PREFIX }}
           key: ${{ env.CACHE_KEY }}
-          fail-on-cache-miss: true
 
-      - name: Verify restored environment
+      - name: Report cache status
+        run: |
+          if [ "${{ steps.restore-env.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache HIT: используем готовое окружение из кэша"
+          else
+            echo "⚠️ Cache MISS: будем собирать Qt/FFmpeg/TagLib с нуля"
+          fi
+
+      # ============================================================
+      # FALLBACK: сборка окружения если кэш не найден
+      # ============================================================
+
+      - name: "[Fallback] Install build tools and dependencies"
+        if: steps.restore-env.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-13 g++-13 \
+            p7zip-full wget curl build-essential yasm nasm \
+            cmake ninja-build pkg-config git \
+            zlib1g-dev libicu-dev libxkbcommon-dev libglu1-mesa-dev \
+            libasound2-dev libpipewire-0.3-dev libsdl2-dev \
+            libsndfile1-dev libopenmpt-dev libgme-dev \
+            libarchive-dev libebur128-dev libsoundtouch-dev libsoxr-dev \
+            libutfcpp-dev
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          sudo update-alternatives --set gcc /usr/bin/gcc-13
+          sudo update-alternatives --set g++ /usr/bin/g++-13
+          gcc --version && g++ --version
+
+      - name: "[Fallback] Download and install prebuilt Qt"
+        if: steps.restore-env.outputs.cache-hit != 'true'
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          IFS=' ' read -r -a archives <<< "${{ env.QT_ARCHIVES }}"
+          for archive in "${archives[@]}"; do
+            [ -z "$archive" ] && continue
+            echo "Downloading $archive..."
+            wget -q "${{ env.QT_BASE_URL }}/$archive"
+            7z x "$archive"
+            rm -f "$archive"
+          done
+          QT_SOURCE_DIR=$(find . -maxdepth 2 -type d -name "gcc_64" | head -n 1)
+          if [ -z "$QT_SOURCE_DIR" ]; then
+            echo "Error: gcc_64 not found"; ls -la; exit 1
+          fi
+          cp -r "$QT_SOURCE_DIR"/* ${{ env.INSTALL_PREFIX }}/
+          chmod +x ${{ env.INSTALL_PREFIX }}/bin/qmake || true
+          ${{ env.INSTALL_PREFIX }}/bin/qmake -v
+
+      - name: "[Fallback] Build and install FFmpeg"
+        if: steps.restore-env.outputs.cache-hit != 'true'
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          wget -q https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          tar xf ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          cd ffmpeg-${{ env.FFMPEG_VERSION }}
+          ./configure \
+            --prefix=${{ env.INSTALL_PREFIX }} \
+            --enable-shared --disable-static --disable-doc \
+            --enable-pic --cc=gcc-13 --cxx=g++-13
+          make -j$(nproc)
+          make install
+
+      - name: "[Fallback] Build and install TagLib"
+        if: steps.restore-env.outputs.cache-hit != 'true'
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          LATEST_JSON=$(curl -s https://api.github.com/repos/taglib/taglib/releases/latest)
+          TAGLIB_URL=$(echo "$LATEST_JSON" | jq -r '.tarball_url')
+          TAGLIB_VER=$(echo "$LATEST_JSON" | jq -r '.tag_name')
+          [ -z "$TAGLIB_URL" ] || [ "$TAGLIB_URL" == "null" ] && echo "Error: no taglib url" && exit 1
+          wget -O taglib-${TAGLIB_VER}.tar.gz "$TAGLIB_URL"
+          tar -xzf taglib-${TAGLIB_VER}.tar.gz
+          TAGLIB_SRC=$(find . -maxdepth 1 -type d -name "taglib-*" | grep -v '\.tar' | head -n 1)
+          cd "$TAGLIB_SRC"
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PREFIX }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-13 \
+            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DBUILD_SHARED_LIBS=ON
+          make -j$(nproc)
+          make install
+
+      - name: "[Fallback] Save built environment to cache"
+        if: steps.restore-env.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.INSTALL_PREFIX }}
+          key: ${{ env.CACHE_KEY }}
+
+      # ============================================================
+      # ДАЛЬНЕЙШАЯ СБОРКА (GCC, зависимости, Fooyin, AppImage)
+      # ============================================================
+
+      - name: Verify build environment
         run: |
           if [ -f "${{ env.INSTALL_PREFIX }}/bin/qmake" ]; then
-            echo "Qt qmake found."
+            echo "✅ Qt qmake found:"
             ${{ env.INSTALL_PREFIX }}/bin/qmake -v
           else
-            echo "Warning: qmake not found in cache."
+            echo "❌ qmake not found in ${{ env.INSTALL_PREFIX }}/bin/"
+            exit 1
           fi
           if [ -f "${{ env.INSTALL_PREFIX }}/lib/libavcodec.so" ]; then
-            echo "FFmpeg libraries found."
+            echo "✅ FFmpeg libraries found."
           else
-            echo "Warning: FFmpeg libraries not found in cache."
+            echo "❌ FFmpeg libraries not found."
+            exit 1
           fi
 
-      # --- УСТАНОВКА GCC-13 (требуется для C++23 std::expected) ---
+      # --- УСТАНОВКА GCC-13 ---
       - name: Install GCC-13
         run: |
           sudo apt-get install -y software-properties-common
@@ -100,10 +211,9 @@ jobs:
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
           sudo update-alternatives --set gcc /usr/bin/gcc-13
           sudo update-alternatives --set g++ /usr/bin/g++-13
-          gcc --version
-          g++ --version
+          gcc --version && g++ --version
 
-      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ СБОРКИ FOOYIN ---
+      # --- УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ ДЛЯ FOOYIN ---
       - name: Install system dependencies for Fooyin build
         uses: actions/setup-python@v5
         with:
@@ -145,7 +255,6 @@ jobs:
           echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
-          echo "Initial ccache stats:"
           ccache -s
 
       # --- СБОРКА FOOYIN ---
@@ -153,8 +262,6 @@ jobs:
         run: |
           cd ${{ env.FOYIN_SOURCE_DIR }}
           mkdir -p build && cd build
-          echo "Starting Fooyin build with ccache..."
-          echo "ccache stats before config/build:"
           ccache -s
 
           cmake .. \
@@ -166,22 +273,14 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-          # --parallel 1 оставлен намеренно: fooyin (C++23 + тяжёлые шаблоны)
-          # при параллельной компиляции выедает всю RAM на GitHub-раннере (7GB)
           cmake --build . --parallel 1
           cmake --build . --parallel 1 --target install
 
-          echo ""
           find $INSTALL_PREFIX -name fooyin -type f
-          echo ""
           echo "Fooyin build/install completed."
-          echo ""
-          ls -la
-          echo ""
-          echo "ccache stats after build:"
           ccache -s
 
-      # --- ПОДГОТОВКА AppDir (Desktop файл и иконка) ---
+      # --- ПОДГОТОВКА AppDir ---
       - name: Prepare AppDir (Desktop file and icon)
         run: |
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/fooyin.png"
@@ -194,16 +293,10 @@ jobs:
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.fooyin.desktop"
           cp "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/org.fooyin.fooyin.png" "$INSTALL_PREFIX/usr/share/icons/hicolor/256x256/apps/org.fooyin.Fooyin.png"
           cp "$INSTALL_PREFIX/share/applications/org.fooyin.fooyin.desktop" "$INSTALL_PREFIX/usr/share/applications/org.fooyin.Fooyin.desktop"
-
-          echo ""
           ls -la "$INSTALL_PREFIX/bin/"
-          echo ""
           ls -la "$INSTALL_PREFIX/share/icons/hicolor/256x256/apps/"
-          echo ""
           ls -la "$INSTALL_PREFIX/share/applications/"
-          echo ""
 
-      # --- Определяем версию Fooyin ---
       - name: Set Version from REF
         id: set-version
         run: |
@@ -221,7 +314,6 @@ jobs:
         run: |
           echo "📦 Generated AppImage files:"
           ls -la Fooyin-*.AppImage*
-          echo "VERSION=${{ env.VERSION }}"
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
@@ -231,7 +323,7 @@ jobs:
             Fooyin-*-x86_64.AppImage
             Fooyin-*-x86_64.AppImage.zsync
 
-      # --- СОХРАНЕНИЕ КЭША CCACHE ---
+      # --- СОХРАНЕНИЕ CCACHE ---
       - name: Save ccache
         if: always()
         uses: actions/cache/save@v4
@@ -239,7 +331,6 @@ jobs:
           path: ${{ github.workspace }}/ccache
           key: ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}
 
-      # ИСПРАВЛЕНО: удаление ccache перенесено ПОСЛЕ сохранения (было ДО сборки)
       - name: Delete old ccache (rotate)
         if: always()
         uses: actions/github-script@v7
@@ -248,36 +339,17 @@ jobs:
             const cacheKey = 'ccache-${{ runner.os }}-${{ env.QT_VERSION }}-${{ env.FFMPEG_VERSION }}';
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-
-            console.log(`🔍 Searching for old ccache entries with key: ${cacheKey}`);
-
             try {
-              const response = await github.rest.actions.getActionsCacheList({
-                owner,
-                repo,
-                per_page: 100
-              });
-
-              const caches = response.data.actions_caches;
-              console.log(`📦 Found ${caches.length} cache entries total`);
-
-              // Удаляем все дубли кроме самого свежего (только что сохранённого)
-              const matching = caches
+              const response = await github.rest.actions.getActionsCacheList({ owner, repo, per_page: 100 });
+              const matching = response.data.actions_caches
                 .filter(c => c.key === cacheKey)
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
               for (const cache of matching.slice(1)) {
-                console.log(`🗑️ Deleting stale ccache ID: ${cache.id}`);
                 await github.rest.actions.deleteActionsCacheById({ owner, repo, cache_id: cache.id });
-                console.log(`✅ Deleted ccache ID ${cache.id}`);
+                console.log(`✅ Deleted stale ccache ID ${cache.id}`);
               }
-
-              if (matching.length <= 1) {
-                console.log(`ℹ️ No stale entries to rotate.`);
-              }
-            } catch (error) {
-              console.error(`❌ Failed to rotate ccache: ${error.message}`);
-            }
+              if (matching.length <= 1) console.log('ℹ️ No stale entries.');
+            } catch (e) { console.error(`❌ ${e.message}`); }
 
       - name: Create GitHub Release
         if: ${{ success() }}
